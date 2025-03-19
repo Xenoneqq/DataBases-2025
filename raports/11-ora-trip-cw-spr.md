@@ -249,11 +249,36 @@ pomocne mogą być materiały dostępne tu:
 https://upel.agh.edu.pl/mod/folder/view.php?id=311899
 w szczególności dokument: `1_ora_modyf.pdf`
 
+# Zadanie 0 - Realizacja
+
+Zaczynamy od utworzenia kolumn no_tickets w tabelach RESERVATION i LOGS
 
 ```sql
+alter table RESERVATION
+    add NO_TICKETS NUMBER
 
--- przyklady, kod, zrzuty ekranów, komentarz ...
+alter table LOG
+    add NO_TICKETS NUMBER
+```
 
+Do tabeli RESERVATION wstawiamy dane które dodatkowo zawierają informację o ilości zakupionych biletów NO_TICKETS
+```sql
+insert  into reservation(trip_id, person_id, status, NO_TICKETS)  
+values (1, 1, 'P', 2);  
+  
+insert into reservation(trip_id, person_id, status , NO_TICKETS)  
+values (1, 2, 'N' , 2);  
+  
+-- trip 2  
+insert into reservation(trip_id, person_id, status , NO_TICKETS)  
+values (2, 1, 'P' , 1);  
+  
+insert into reservation(trip_id, person_id, status, NO_TICKETS)  
+values (2, 4, 'C', 1);  
+  
+-- trip 3  
+insert into reservation(trip_id, person_id, status, NO_TICKETS)  
+values (3, 4, 'P', 2);
 ```
 
 ---
@@ -280,11 +305,31 @@ Proponowany zestaw widoków można rozbudować wedle uznania/potrzeb
 # Zadanie 1  - rozwiązanie
 
 ```sql
+-- widok 1
+CREATE VIEW vw_reservation AS SELECT
+RESERVATION_ID, COUNTRY, TRIP_DATE, TRIP_NAME,
+FIRSTNAME, LASTNAME, STATUS, TRIP.TRIP_ID, PERSON.PERSON_ID, NO_TICKETS
+FROM
+RESERVATION INNER JOIN PERSON
+ON RESERVATION.PERSON_ID = PERSON.PERSON_ID
+INNER JOIN TRIP ON RESERVATION.TRIP_ID = TRIP.TRIP_ID;
 
--- wyniki, kod, zrzuty ekranów, komentarz ...
+-- widok 2
+CREATE VIEW vw_trip AS SELECT
+    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES,
+    (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) AS NO_AVAILABLE_PLACES
+FROM TRIP T
+LEFT JOIN RESERVATION R ON T.TRIP_ID = R.TRIP_ID
+GROUP BY T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES;
 
-
-
+-- widok 3
+CREATE VIEW vw_available_trip AS SELECT
+    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES,
+    (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) AS NO_AVAILABLE_PLACES
+FROM TRIP T
+LEFT JOIN RESERVATION R ON T.TRIP_ID = R.TRIP_ID
+GROUP BY T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES
+HAVING (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) > 0 AND SYSDATE < T.TRIP_DATE;
 ```
 
 
@@ -321,7 +366,27 @@ Proponowany zestaw funkcji można rozbudować wedle uznania/potrzeb
 
 ```sql
 
--- wyniki, kod, zrzuty ekranów, komentarz ...
+create or replace type trip_participants_table as object (
+    trip_id number,
+    trip_name varchar2(100),
+    trip_date date,
+    person_id number,
+    first_name varchar2(50),
+    last_name varchar2(50)
+);
+
+create or replace function f_trip_participants(selected_trip number)
+return trip_participants_table
+as
+result trip_participants_table;
+begin
+    SELECT TRIP.TRIP_ID, TRIP_NAME, TRIP_DATE, PERSON.PERSON_ID, FIRSTNAME, LASTNAME
+    BULK COLLECT INTO result
+    FROM RESERVATION INNER JOIN TRIP ON RESERVATION.TRIP_ID = TRIP.TRIP_ID
+    INNER JOIN PERSON ON RESERVATION.PERSON_ID = PERSON.PERSON_ID
+    WHERE TRIP.TRIP_ID = selected_trip;
+    return result;
+end;
 
 ```
 
