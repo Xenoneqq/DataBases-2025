@@ -304,33 +304,68 @@ Proponowany zestaw widoków można rozbudować wedle uznania/potrzeb
 
 # Zadanie 1  - rozwiązanie
 
+
+Realizacją zadanie jest stworzenie kilku widoków, które ułatwią dostęp do danych. Każdy z widoków pełni określoną funkcję.
+
+### 1. Widok `vw_reservation`
+
+Widok `vw_reservation` łączy dane z tabel `trip`, `person` i `reservation`, aby uzyskać szczegółowe informacje o rezerwacjach, uczestnikach oraz szczegółach wycieczek.
+
 ```sql
--- widok 1
-CREATE VIEW vw_reservation AS SELECT
-RESERVATION_ID, COUNTRY, TRIP_DATE, TRIP_NAME,
-FIRSTNAME, LASTNAME, STATUS, TRIP.TRIP_ID, PERSON.PERSON_ID, NO_TICKETS
+CREATE VIEW vw_reservation AS 
+SELECT
+    RESERVATION_ID, COUNTRY, TRIP_DATE, TRIP_NAME,
+    FIRSTNAME, LASTNAME, STATUS, TRIP.TRIP_ID, PERSON.PERSON_ID, NO_TICKETS
 FROM
-RESERVATION INNER JOIN PERSON
-ON RESERVATION.PERSON_ID = PERSON.PERSON_ID
-INNER JOIN TRIP ON RESERVATION.TRIP_ID = TRIP.TRIP_ID;
-
--- widok 2
-CREATE VIEW vw_trip AS SELECT
-    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES,
-    (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) AS NO_AVAILABLE_PLACES
-FROM TRIP T
-LEFT JOIN RESERVATION R ON T.TRIP_ID = R.TRIP_ID
-GROUP BY T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES;
-
--- widok 3
-CREATE VIEW vw_available_trip AS SELECT
-    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES,
-    (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) AS NO_AVAILABLE_PLACES
-FROM TRIP T
-LEFT JOIN RESERVATION R ON T.TRIP_ID = R.TRIP_ID
-GROUP BY T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES
-HAVING (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) > 0 AND SYSDATE < T.TRIP_DATE;
+    RESERVATION 
+    INNER JOIN PERSON ON RESERVATION.PERSON_ID = PERSON.PERSON_ID
+    INNER JOIN TRIP ON RESERVATION.TRIP_ID = TRIP.TRIP_ID;
 ```
+
+#### Opis:
+- Widok łączy dane z trzech tabel (`RESERVATION`, `PERSON`, `TRIP`), zwracając szczegóły dotyczące rezerwacji, wycieczki oraz osoby, która dokonała rezerwacji. 
+
+
+### 2. Widok `vw_trip`
+
+Widok `vw_trip` prezentuje informacje o wszystkich dostępnych wycieczkach wraz z liczbą dostępnych miejsc. Oblicza liczbę wolnych miejsc na podstawie zarezerwowanych biletów.
+
+```sql
+CREATE VIEW vw_trip AS 
+SELECT
+    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES,
+    (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) AS NO_AVAILABLE_PLACES
+FROM 
+    TRIP T
+    LEFT JOIN RESERVATION R ON T.TRIP_ID = R.TRIP_ID
+GROUP BY 
+    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES;
+```
+
+#### Opis:
+- Widok oblicza liczbę dostępnych miejsc na każdej wycieczce, uwzględniając liczbę zarezerwowanych biletów. Zwracane dane obejmują identyfikator wycieczki, nazwę, kraj, datę oraz liczbę dostępnych miejsc.
+
+### 3. Widok `vw_available_trip`
+
+Widok `vw_available_trip` wyświetla tylko te wycieczki, które mają dostępne miejsca i które jeszcze się nie odbyły.
+
+```sql
+CREATE VIEW vw_available_trip AS 
+SELECT
+    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES,
+    (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) AS NO_AVAILABLE_PLACES
+FROM 
+    TRIP T
+    LEFT JOIN RESERVATION R ON T.TRIP_ID = R.TRIP_ID
+GROUP BY 
+    T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES
+HAVING 
+    (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) > 0 
+    AND SYSDATE < T.TRIP_DATE;
+```
+
+#### Opis:
+- Widok filtruje wycieczki, pokazując tylko te, które są dostępne (mają wolne miejsca) oraz te, które nie odbyły się jeszcze w przeszłości. Zwracane dane obejmują te same informacje co w widoku `vw_trip`, z dodatkowym warunkiem daty.
 
 
 
@@ -364,30 +399,145 @@ Proponowany zestaw funkcji można rozbudować wedle uznania/potrzeb
 
 # Zadanie 2  - rozwiązanie
 
+Realizacja tego zadania obejmuje utworzenie funkcji korzystając z następnujących elementów:
+
+### 1. Typy Obiektowe
+
+#### Typ Obiektowy `trip_participant_obj`
+
+Typ obiektowy `trip_participant_obj` reprezentuje pojedynczego uczestnika rezerwacji na wycieczce. Zawiera informacje o rezerwacji, uczestniku oraz szczegółach wycieczki.
+
 ```sql
-
-create or replace type trip_participants_table as object (
-    trip_id number,
-    trip_name varchar2(100),
-    trip_date date,
-    person_id number,
-    first_name varchar2(50),
-    last_name varchar2(50)
+CREATE OR REPLACE TYPE trip_participant_obj AS OBJECT (
+    RESERVATION_ID NUMBER,
+    COUNTRY VARCHAR2(100),
+    TRIP_DATE DATE,
+    TRIP_NAME VARCHAR2(100),
+    FIRSTNAME VARCHAR2(100),
+    LASTNAME VARCHAR2(100),
+    STATUS VARCHAR2(1),
+    TRIP_ID NUMBER,
+    PERSON_ID NUMBER,
+    NO_TICKETS NUMBER
 );
+```
 
-create or replace function f_trip_participants(selected_trip number)
-return trip_participants_table
-as
-result trip_participants_table;
-begin
-    SELECT TRIP.TRIP_ID, TRIP_NAME, TRIP_DATE, PERSON.PERSON_ID, FIRSTNAME, LASTNAME
+#### Typ Tablicowy `trip_participant_table`
+
+Typ tablicowy `trip_participant_table` to kolekcja obiektów `trip_participant_obj`, przechowująca listę uczestników rezerwacji.
+
+```sql
+CREATE OR REPLACE TYPE trip_participant_table AS TABLE OF trip_participant_obj;
+```
+
+#### Typ Obiektowy `available_trip_obj`
+
+Typ obiektowy `available_trip_obj` reprezentuje szczegóły wycieczki oraz liczbę dostępnych miejsc na danej wycieczce.
+
+```sql
+CREATE OR REPLACE TYPE available_trip_obj AS OBJECT (
+    TRIP_ID NUMBER,
+    COUNTRY VARCHAR2(100),
+    TRIP_DATE DATE,
+    TRIP_NAME VARCHAR2(100),
+    AVAILABLE_PLACES NUMBER
+);
+```
+
+#### Typ Tablicowy `available_trip_table`
+
+Typ tablicowy `available_trip_table` to kolekcja obiektów `available_trip_obj`, przechowująca listę dostępnych wycieczek.
+
+```sql
+CREATE OR REPLACE TYPE available_trip_table AS TABLE OF available_trip_obj;
+```
+
+### 2. Funkcje
+
+#### Funkcja `f_trip_participants`
+
+Funkcja `f_trip_participants` zwraca listę uczestników dla wskazanej wycieczki (`p_trip_id`). Zwracane dane obejmują szczegóły rezerwacji, osoby oraz informacje o wycieczce.
+
+```sql
+CREATE OR REPLACE FUNCTION f_trip_participants (p_trip_id NUMBER)
+RETURN trip_participant_table AS
+    result trip_participant_table := trip_participant_table();
+BEGIN
+    SELECT
+        trip_participant_obj(
+            RESERVATION_ID, COUNTRY, TRIP_DATE, TRIP_NAME,
+            FIRSTNAME, LASTNAME, STATUS, TRIP.TRIP_ID, PERSON.PERSON_ID, NO_TICKETS
+        )
     BULK COLLECT INTO result
-    FROM RESERVATION INNER JOIN TRIP ON RESERVATION.TRIP_ID = TRIP.TRIP_ID
-    INNER JOIN PERSON ON RESERVATION.PERSON_ID = PERSON.PERSON_ID
-    WHERE TRIP.TRIP_ID = selected_trip;
-    return result;
-end;
+    FROM
+        RESERVATION
+        INNER JOIN PERSON ON RESERVATION.PERSON_ID = PERSON.PERSON_ID
+        INNER JOIN TRIP ON RESERVATION.TRIP_ID = TRIP.TRIP_ID
+    WHERE
+        TRIP.TRIP_ID = p_trip_id;
 
+    RETURN result;
+END;
+```
+
+#### Funkcja `f_person_reservations`
+
+Funkcja `f_person_reservations` zwraca listę rezerwacji dla danej osoby (`p_person_id`). Zawiera szczegóły rezerwacji, wycieczki oraz dane osoby.
+
+```sql
+CREATE OR REPLACE FUNCTION f_person_reservations (p_person_id NUMBER)
+RETURN trip_participant_table AS
+    result trip_participant_table := trip_participant_table();
+BEGIN
+    SELECT
+        trip_participant_obj(
+            RESERVATION_ID, COUNTRY, TRIP_DATE, TRIP_NAME,
+            FIRSTNAME, LASTNAME, STATUS, TRIP.TRIP_ID, PERSON.PERSON_ID, NO_TICKETS
+        )
+    BULK COLLECT INTO result
+    FROM
+        RESERVATION
+        INNER JOIN PERSON ON RESERVATION.PERSON_ID = PERSON.PERSON_ID
+        INNER JOIN TRIP ON RESERVATION.TRIP_ID = TRIP.TRIP_ID
+    WHERE
+        PERSON.PERSON_ID = p_person_id;
+
+    RETURN result;
+END;
+```
+
+#### Funkcja `f_available_trips_to`
+
+Funkcja `f_available_trips_to` zwraca listę dostępnych wycieczek do wskazanego kraju (`p_country`) w zadanym okresie czasu (`p_date_from`, `p_date_to`). Oblicza liczbę dostępnych miejsc na każdej wycieczce.
+
+```sql
+CREATE OR REPLACE FUNCTION f_available_trips_to (
+    p_country VARCHAR2,
+    p_date_from DATE,
+    p_date_to DATE
+) RETURN available_trip_table AS
+    result available_trip_table := available_trip_table();
+BEGIN
+    SELECT
+        available_trip_obj(
+            T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME,
+            (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0))
+        )
+    BULK COLLECT INTO result
+    FROM
+        TRIP T
+        LEFT JOIN RESERVATION R ON T.TRIP_ID = R.TRIP_ID
+    WHERE
+        T.COUNTRY = p_country
+        AND T.TRIP_DATE BETWEEN p_date_from AND p_date_to
+    GROUP BY
+        T.TRIP_ID, T.COUNTRY, T.TRIP_DATE, T.TRIP_NAME, T.MAX_NO_PLACES
+    HAVING
+        (T.MAX_NO_PLACES - COALESCE(SUM(R.NO_TICKETS), 0)) > 0
+        AND SYSDATE < T.TRIP_DATE;
+
+    RETURN result;
+END;
 ```
 
 
@@ -428,13 +578,240 @@ Proponowany zestaw procedur można rozbudować wedle uznania/potrzeb
 
 # Zadanie 3  - rozwiązanie
 
+W ramach realizacji zadania zostały stworzone cztery procedury, które pozwalają na dodawanie, modyfikowanie statusu, zmienianie liczby miejsc rezerwacji oraz zmienianie maksymalnej liczby dostępnych miejsc na wycieczce.
+
+### 1. Procedura `p_add_reservation`
+
+Procedura `p_add_reservation` umożliwia dodanie nowej rezerwacji na wycieczkę. Zanim rezerwacja zostanie dodana, sprawdzana jest dostępność miejsc na wycieczce i czy wycieczka nie jest już zakończona.
+
 ```sql
+CREATE OR REPLACE PROCEDURE p_add_reservation (
+    p_trip_id NUMBER,
+    p_person_id NUMBER,
+    p_no_tickets NUMBER
+) AS
+    trip_date DATE;
+    occupied NUMBER;
+    free_spots NUMBER;
+BEGIN
+    BEGIN
+        SELECT TRIP_DATE, MAX_NO_PLACES INTO trip_date, free_spots
+        FROM TRIP WHERE TRIP.TRIP_ID = p_trip_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-10000, 'This trip does not exist...');
+    END;
 
--- wyniki, kod, zrzuty ekranów, komentarz ...
+    IF trip_date < SYSDATE THEN
+        RAISE_APPLICATION_ERROR(-10001, 'Picked an old trip...');
+    END IF;
 
+    SELECT COALESCE(SUM(RESERVATION.NO_TICKETS), 0) INTO occupied
+    FROM RESERVATION
+    WHERE RESERVATION.TRIP_ID = p_trip_id
+    AND RESERVATION.STATUS IN ('N', 'P');
+
+    IF occupied + p_no_tickets > free_spots THEN
+        RAISE_APPLICATION_ERROR(-10002, 'Trip is full...');
+    END IF;
+
+    INSERT INTO RESERVATION (TRIP_ID, PERSON_ID, STATUS, NO_TICKETS)
+    VALUES (p_trip_id, p_person_id, 'N', p_no_tickets);
+
+    COMMIT;
+END;
 ```
 
+#### Opis:
 
+- Procedura pobiera ID wycieczki, ID osoby oraz liczbę biletów.
+- Sprawdza, czy wycieczka istnieje oraz czy data wycieczki nie jest przeszła.
+- Sprawdza dostępność miejsc na wycieczce.
+- Dodaje nową rezerwację, jeżeli warunki są spełnione.
+
+### 2. Procedura `p_modify_reservation_status`
+
+Procedura `p_modify_reservation_status` umożliwia zmianę statusu rezerwacji, z dodatkowymi kontrolami dotyczącymi dostępności miejsc.
+
+```sql
+CREATE OR REPLACE PROCEDURE p_modify_reservation_status (
+    p_reservation_id NUMBER,
+    p_status VARCHAR2
+) AS
+    current_status VARCHAR2(1);
+    trip_id NUMBER;
+    trip_date DATE;
+    free_spots NUMBER;
+    occupied NUMBER;
+BEGIN
+    BEGIN
+        SELECT STATUS, TRIP_ID INTO current_status, trip_id
+        FROM RESERVATION
+        WHERE RESERVATION_ID = p_reservation_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-10000, 'Reservation not found...');
+    END;
+
+    IF current_status = 'C' AND p_status IN ('N', 'P') THEN
+        BEGIN
+            SELECT TRIP_DATE, MAX_NO_PLACES INTO trip_date, free_spots
+            FROM TRIP WHERE TRIP_ID = trip_id;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RAISE_APPLICATION_ERROR(-10001, 'Trip not found...');
+        END;
+
+        SELECT COALESCE(SUM(NO_TICKETS), 0) INTO occupied
+        FROM RESERVATION
+        WHERE TRIP_ID = trip_id
+        AND STATUS IN ('N', 'P');
+
+        IF occupied >= free_spots THEN
+            RAISE_APPLICATION_ERROR(-10002, 'No available spots on the trip...');
+        END IF;
+    END IF;
+
+    UPDATE RESERVATION
+    SET STATUS = p_status
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    INSERT INTO LOG (RESERVATION_ID, LOG_DATE, STATUS, NO_TICKETS)
+    SELECT RESERVATION_ID, SYSDATE, p_status, NO_TICKETS
+    FROM RESERVATION
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    COMMIT;
+END;
+```
+
+#### Opis:
+
+- Procedura zmienia status rezerwacji (np. z "N" na "P" lub "C").
+- Przed zmianą statusu sprawdza, czy wycieczka ma dostępne miejsca.
+- Loguje zmianę statusu w tabeli logów.
+
+### 3. Procedura `p_modify_reservation`
+
+Procedura `p_modify_reservation` pozwala na zmianę liczby biletów w już istniejącej rezerwacji, biorąc pod uwagę dostępność miejsc na wycieczce.
+
+```sql
+CREATE OR REPLACE PROCEDURE p_modify_reservation (
+    p_reservation_id NUMBER,
+    p_no_tickets NUMBER
+) AS
+    current_no_tickets NUMBER;
+    trip_id NUMBER;
+    free_spots NUMBER;
+    occupied NUMBER;
+BEGIN
+    BEGIN
+        SELECT NO_TICKETS, TRIP_ID INTO current_no_tickets, trip_id
+        FROM RESERVATION
+        WHERE RESERVATION_ID = p_reservation_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-10000, 'Reservation not found...');
+    END;
+
+    SELECT MAX_NO_PLACES INTO free_spots
+    FROM (
+        SELECT MAX_NO_PLACES
+        FROM TRIP
+        WHERE TRIP_ID = trip_id
+    ) WHERE ROWNUM = 1;
+
+
+    SELECT COALESCE(SUM(NO_TICKETS), 0) INTO occupied
+    FROM RESERVATION
+    WHERE TRIP_ID = trip_id
+    AND STATUS IN ('N', 'P');
+
+    IF (occupied - current_no_tickets + p_no_tickets) > free_spots THEN
+        RAISE_APPLICATION_ERROR(-10001, 'Not enough available spots on the trip...');
+    END IF;
+
+    UPDATE RESERVATION
+    SET NO_TICKETS = p_no_tickets
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    INSERT INTO LOG (RESERVATION_ID, LOG_DATE, STATUS, NO_TICKETS)
+    SELECT RESERVATION_ID, SYSDATE, STATUS, p_no_tickets
+    FROM RESERVATION
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    COMMIT;
+END;
+```
+
+#### Opis:
+
+- Procedura umożliwia zmianę liczby biletów w rezerwacji.
+- Przed zmianą sprawdzana jest dostępność miejsc.
+- Zmiana liczby biletów jest logowana w tabeli logów.
+
+### 4. Procedura `p_modify_max_no_places`
+
+Procedura `p_modify_max_no_places` umożliwia zmianę maksymalnej liczby miejsc na wycieczce, jeśli liczba zarezerwowanych biletów nie przekracza nowej wartości.
+
+```sql
+CREATE OR REPLACE PROCEDURE p_modify_max_no_places (
+    p_trip_id NUMBER,
+    p_max_no_places NUMBER
+) AS
+    reserved NUMBER;
+BEGIN
+    SELECT COALESCE(SUM(NO_TICKETS), 0) INTO reserved
+    FROM RESERVATION
+    WHERE TRIP_ID = p_trip_id
+    AND STATUS IN ('N', 'P');
+
+    IF p_max_no_places < reserved THEN
+        RAISE_APPLICATION_ERROR(-10000, 'Cannot reduce the number of places below the number of reserved tickets...');
+    END IF;
+
+    UPDATE TRIP
+    SET MAX_NO_PLACES = p_max_no_places
+    WHERE TRIP_ID = p_trip_id;
+
+    COMMIT;
+END;
+```
+
+#### Opis:
+
+- Procedura umożliwia zmianę maksymalnej liczby miejsc na wycieczce, ale tylko jeśli liczba zarezerwowanych biletów nie przekracza nowej liczby dostępnych miejsc.
+- W przypadku próby zmniejszenia liczby miejsc poniżej liczby zarezerwowanych biletów, procedura zwróci błąd.
+
+### 5. Przykładowe wywołania
+
+- Dodanie nowej rezerwacji:
+```sql
+BEGIN
+    p_add_reservation(1, 3, 2);
+END;
+```
+
+- Modyfikacja statusu rezerwacji:
+```sql
+BEGIN
+    p_modify_reservation_status(27, 'P');
+END;
+```
+
+- Modyfikacja ilości zamówionych biletów **(Tu coś nie działa)**
+```sql
+BEGIN
+    p_modify_reservation(26, 1);
+END;
+```
+
+- Modyfikacja maksymalnej ilości miejsc na wyjeździe
+```sql
+BEGIN
+    p_modify_max_no_places(4, 50);
+END;
+```
 
 ---
 # Zadanie 4  - triggery
