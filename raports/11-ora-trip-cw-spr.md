@@ -1039,10 +1039,49 @@ Należy przygotować procedury: `p_add_reservation_5`, `p_modify_reservation_sta
 
 # Zadanie 5  - rozwiązanie
 
+Trigger - Sprawdzanie daty wycieczki
 ```sql
+CREATE OR REPLACE TRIGGER T_CHECK_TRIP_DATE
+BEFORE INSERT ON RESERVATION
+FOR EACH ROW
+DECLARE
+    v_trip_date DATE;
+BEGIN
+    SELECT TRIP_DATE INTO v_trip_date
+    FROM TRIP
+    WHERE TRIP_ID = :NEW.TRIP_ID;
 
--- wyniki, kod, zrzuty ekranów, komentarz ...
+    IF v_trip_date < SYSDATE THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Picked an old trip...');
+    END IF;
+END;
+```
 
+Trigger - dostępność miejsc
+```sql
+CREATE OR REPLACE TRIGGER T_CHECK_FREESPOTS
+BEFORE INSERT OR UPDATE ON RESERVATION
+FOR EACH ROW
+DECLARE
+    v_max_places NUMBER;
+    v_occupied NUMBER;
+    v_current_tickets NUMBER;
+BEGIN
+    SELECT MAX_NO_PLACES INTO v_max_places
+    FROM TRIP
+    WHERE TRIP_ID = :NEW.TRIP_ID;
+
+    SELECT COALESCE(SUM(NO_TICKETS), 0) INTO v_occupied
+    FROM RESERVATION
+    WHERE TRIP_ID = :NEW.TRIP_ID
+    AND STATUS IN ('N', 'P');
+
+    v_current_tickets := COALESCE(:OLD.NO_TICKETS, 0);
+
+    IF (v_occupied - v_current_tickets + :NEW.NO_TICKETS) > v_max_places THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Not enough available spots on the trip...');
+    END IF;
+END;
 ```
 
 ---
