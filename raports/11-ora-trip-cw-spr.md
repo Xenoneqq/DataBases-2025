@@ -914,7 +914,7 @@ BEGIN
         WHERE RESERVATION_ID = p_reservation_id;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-10000, 'Reservation not found...');
+            RAISE_APPLICATION_ERROR(-20000, 'Reservation not found...');
     END;
 
     IF current_status = 'C' AND p_status IN ('N', 'P') THEN
@@ -923,7 +923,7 @@ BEGIN
             FROM TRIP WHERE TRIP_ID = trip_id;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                RAISE_APPLICATION_ERROR(-10001, 'Trip not found...');
+                RAISE_APPLICATION_ERROR(-20001, 'Trip not found...');
         END;
 
         SELECT COALESCE(SUM(NO_TICKETS), 0) INTO occupied
@@ -932,7 +932,7 @@ BEGIN
         AND STATUS IN ('N', 'P');
 
         IF occupied >= free_spots THEN
-            RAISE_APPLICATION_ERROR(-10002, 'No available spots on the trip...');
+            RAISE_APPLICATION_ERROR(-20002, 'No available spots on the trip...');
         END IF;
     END IF;
 
@@ -1081,6 +1081,91 @@ BEGIN
     IF (v_occupied - v_current_tickets + :NEW.NO_TICKETS) > v_max_places THEN
         RAISE_APPLICATION_ERROR(-20002, 'Not enough available spots on the trip...');
     END IF;
+END;
+```
+W ramach zadania powstały odpowiednie procedury, które nie posiadają sprawdzeń ilości miejsc oraz dat.
+
+#### p_add_reservation_5
+```sql
+CREATE OR REPLACE PROCEDURE p_add_reservation_5 (
+    p_trip_id NUMBER,
+    p_person_id NUMBER,
+    p_no_tickets NUMBER
+) AS
+    trip_date DATE;
+    occupied NUMBER;
+    free_spots NUMBER;
+BEGIN
+    BEGIN
+        SELECT TRIP_DATE, MAX_NO_PLACES INTO trip_date, free_spots
+        FROM TRIP WHERE TRIP.TRIP_ID = p_trip_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20000, 'This trip does not exist...');
+    END;
+
+    INSERT INTO RESERVATION (TRIP_ID, PERSON_ID, STATUS, NO_TICKETS)
+    VALUES (p_trip_id, p_person_id, 'N', p_no_tickets);
+
+    COMMIT;
+END;
+```
+
+#### p_modify_reservation_status_5
+
+```sql
+CREATE OR REPLACE PROCEDURE p_modify_reservation_status_5 (
+    p_reservation_id NUMBER,
+    p_status VARCHAR2
+) AS
+    current_status VARCHAR2(1);
+    trip_id NUMBER;
+    trip_date DATE;
+    free_spots NUMBER;
+    occupied NUMBER;
+BEGIN
+    BEGIN
+        SELECT STATUS, TRIP_ID INTO current_status, trip_id
+        FROM RESERVATION
+        WHERE RESERVATION_ID = p_reservation_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20000, 'Reservation not found...');
+    END;
+
+    UPDATE RESERVATION
+    SET STATUS = p_status
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    COMMIT;
+END;
+```
+
+```sql
+CREATE OR REPLACE PROCEDURE p_modify_reservation_status_5 (
+    p_reservation_id NUMBER,
+    p_status VARCHAR2
+) AS
+    current_status VARCHAR2(1);
+    trip_id NUMBER;
+    trip_date DATE;
+    free_spots NUMBER;
+    occupied NUMBER;
+BEGIN
+    BEGIN
+        SELECT STATUS, TRIP_ID INTO current_status, trip_id
+        FROM RESERVATION
+        WHERE RESERVATION_ID = p_reservation_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20000, 'Reservation not found...');
+    END;
+
+    UPDATE RESERVATION
+    SET STATUS = p_status
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    COMMIT;
 END;
 ```
 
