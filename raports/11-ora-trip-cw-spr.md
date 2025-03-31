@@ -599,11 +599,11 @@ BEGIN
         FROM TRIP WHERE TRIP.TRIP_ID = p_trip_id;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-10000, 'This trip does not exist...');
+            RAISE_APPLICATION_ERROR(-20000, 'This trip does not exist...');
     END;
 
     IF trip_date < SYSDATE THEN
-        RAISE_APPLICATION_ERROR(-10001, 'Picked an old trip...');
+        RAISE_APPLICATION_ERROR(-20001, 'Picked an old trip...');
     END IF;
 
     SELECT COALESCE(SUM(RESERVATION.NO_TICKETS), 0) INTO occupied
@@ -612,7 +612,7 @@ BEGIN
     AND RESERVATION.STATUS IN ('N', 'P');
 
     IF occupied + p_no_tickets > free_spots THEN
-        RAISE_APPLICATION_ERROR(-10002, 'Trip is full...');
+        RAISE_APPLICATION_ERROR(-20002, 'Trip is full...');
     END IF;
 
     INSERT INTO RESERVATION (TRIP_ID, PERSON_ID, STATUS, NO_TICKETS)
@@ -650,7 +650,7 @@ BEGIN
         WHERE RESERVATION_ID = p_reservation_id;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-10000, 'Reservation not found...');
+            RAISE_APPLICATION_ERROR(-20000, 'Reservation not found...');
     END;
 
     IF current_status = 'C' AND p_status IN ('N', 'P') THEN
@@ -659,7 +659,7 @@ BEGIN
             FROM TRIP WHERE TRIP_ID = trip_id;
         EXCEPTION
             WHEN NO_DATA_FOUND THEN
-                RAISE_APPLICATION_ERROR(-10001, 'Trip not found...');
+                RAISE_APPLICATION_ERROR(-20001, 'Trip not found...');
         END;
 
         SELECT COALESCE(SUM(NO_TICKETS), 0) INTO occupied
@@ -668,7 +668,7 @@ BEGIN
         AND STATUS IN ('N', 'P');
 
         IF occupied >= free_spots THEN
-            RAISE_APPLICATION_ERROR(-10002, 'No available spots on the trip...');
+            RAISE_APPLICATION_ERROR(-20002, 'No available spots on the trip...');
         END IF;
     END IF;
 
@@ -767,7 +767,7 @@ BEGIN
     AND STATUS IN ('N', 'P');
 
     IF p_max_no_places < reserved THEN
-        RAISE_APPLICATION_ERROR(-10000, 'Cannot reduce the number of places below the number of reserved tickets...');
+        RAISE_APPLICATION_ERROR(-20000, 'Cannot reduce the number of places below the number of reserved tickets...');
     END IF;
 
     UPDATE TRIP
@@ -872,11 +872,11 @@ BEGIN
         FROM TRIP WHERE TRIP.TRIP_ID = p_trip_id;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-10000, 'This trip does not exist...');
+            RAISE_APPLICATION_ERROR(-20000, 'This trip does not exist...');
     END;
 
     IF trip_date < SYSDATE THEN
-        RAISE_APPLICATION_ERROR(-10001, 'Picked an old trip...');
+        RAISE_APPLICATION_ERROR(-20001, 'Picked an old trip...');
     END IF;
 
     SELECT COALESCE(SUM(RESERVATION.NO_TICKETS), 0) INTO occupied
@@ -885,7 +885,7 @@ BEGIN
     AND RESERVATION.STATUS IN ('N', 'P');
 
     IF occupied + p_no_tickets > free_spots THEN
-        RAISE_APPLICATION_ERROR(-10002, 'Trip is full...');
+        RAISE_APPLICATION_ERROR(-20002, 'Trip is full...');
     END IF;
 
     INSERT INTO RESERVATION (TRIP_ID, PERSON_ID, STATUS, NO_TICKETS)
@@ -1141,19 +1141,20 @@ BEGIN
 END;
 ```
 
+#### p_modify_reservation_5
+
 ```sql
-CREATE OR REPLACE PROCEDURE p_modify_reservation_status_5 (
+CREATE OR REPLACE PROCEDURE p_modify_reservation_5 (
     p_reservation_id NUMBER,
-    p_status VARCHAR2
+    p_no_tickets NUMBER
 ) AS
-    current_status VARCHAR2(1);
-    trip_id NUMBER;
-    trip_date DATE;
-    free_spots NUMBER;
-    occupied NUMBER;
+    p_current_no_tickets NUMBER;
+    p_trip_id NUMBER;
+    p_free_spots NUMBER;
+    p_occupied NUMBER;
 BEGIN
     BEGIN
-        SELECT STATUS, TRIP_ID INTO current_status, trip_id
+        SELECT NO_TICKETS, TRIP_ID INTO p_current_no_tickets, p_trip_id
         FROM RESERVATION
         WHERE RESERVATION_ID = p_reservation_id;
     EXCEPTION
@@ -1162,11 +1163,14 @@ BEGIN
     END;
 
     UPDATE RESERVATION
-    SET STATUS = p_status
+    SET NO_TICKETS = p_no_tickets
     WHERE RESERVATION_ID = p_reservation_id;
 
     COMMIT;
 END;
+/
+
+
 ```
 
 ---
