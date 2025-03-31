@@ -700,35 +700,32 @@ CREATE OR REPLACE PROCEDURE p_modify_reservation (
     p_reservation_id NUMBER,
     p_no_tickets NUMBER
 ) AS
-    current_no_tickets NUMBER;
-    trip_id NUMBER;
-    free_spots NUMBER;
-    occupied NUMBER;
+    p_current_no_tickets NUMBER;
+    p_trip_id NUMBER;
+    p_free_spots NUMBER;
+    p_occupied NUMBER;
 BEGIN
     BEGIN
-        SELECT NO_TICKETS, TRIP_ID INTO current_no_tickets, trip_id
+        SELECT NO_TICKETS, TRIP_ID INTO p_current_no_tickets, p_trip_id
         FROM RESERVATION
         WHERE RESERVATION_ID = p_reservation_id;
     EXCEPTION
         WHEN NO_DATA_FOUND THEN
-            RAISE_APPLICATION_ERROR(-10000, 'Reservation not found...');
+            RAISE_APPLICATION_ERROR(-20000, 'Reservation not found...');
     END;
 
-    SELECT MAX_NO_PLACES INTO free_spots
-    FROM (
-        SELECT MAX_NO_PLACES
-        FROM TRIP
-        WHERE TRIP_ID = trip_id
-    ) WHERE ROWNUM = 1;
+    SELECT MAX_NO_PLACES INTO p_free_spots
+    FROM TRIP
+    WHERE TRIP.TRIP_ID = p_trip_id
+    AND ROWNUM = 1;
 
-
-    SELECT COALESCE(SUM(NO_TICKETS), 0) INTO occupied
+    SELECT COALESCE(SUM(NO_TICKETS), 0) INTO p_occupied
     FROM RESERVATION
-    WHERE TRIP_ID = trip_id
+    WHERE TRIP_ID = p_trip_id
     AND STATUS IN ('N', 'P');
 
-    IF (occupied - current_no_tickets + p_no_tickets) > free_spots THEN
-        RAISE_APPLICATION_ERROR(-10001, 'Not enough available spots on the trip...');
+    IF (p_occupied - p_current_no_tickets + p_no_tickets) > p_free_spots THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Not enough available spots on the trip...');
     END IF;
 
     UPDATE RESERVATION
@@ -742,6 +739,9 @@ BEGIN
 
     COMMIT;
 END;
+/
+
+
 ```
 
 #### Opis:
@@ -799,10 +799,10 @@ BEGIN
 END;
 ```
 
-- Modyfikacja ilości zamówionych biletów **(Tu coś nie działa)**
+- Modyfikacja ilości zamówionych biletów
 ```sql
 BEGIN
-    p_modify_reservation(26, 1);
+    p_modify_reservation(41, 5);
 END;
 ```
 
