@@ -850,6 +850,7 @@ FOR EACH ROW
 BEGIN
     INSERT INTO LOG (RESERVATION_ID, LOG_DATE, STATUS, NO_TICKETS)
     VALUES (:NEW.RESERVATION_ID, SYSDATE, :NEW.STATUS, :NEW.NO_TICKETS);
+    COMMIT;
 END;
 ```
 
@@ -1054,6 +1055,7 @@ BEGIN
     IF v_trip_date < SYSDATE THEN
         RAISE_APPLICATION_ERROR(-20001, 'Picked an old trip...');
     END IF;
+    COMMIT;
 END;
 ```
 
@@ -1081,6 +1083,7 @@ BEGIN
     IF (v_occupied - v_current_tickets + :NEW.NO_TICKETS) > v_max_places THEN
         RAISE_APPLICATION_ERROR(-20002, 'Not enough available spots on the trip...');
     END IF;
+    COMMIT;
 END;
 ```
 W ramach zadania powstały odpowiednie procedury, które nie posiadają sprawdzeń ilości miejsc oraz dat.
