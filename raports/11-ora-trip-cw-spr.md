@@ -1654,7 +1654,19 @@ WHERE
 
 Porównaj sposób programowania w systemie Oracle PL/SQL ze znanym ci systemem/językiem MS Sqlserver T-SQL
 
-```sql
--- komentarz ...
+## **Porównanie Oracle PL/SQL i Microsoft SQL Server T-SQL**  
 
-```
+Oracle PL/SQL i Microsoft SQL Server T-SQL to dwa różne języki służące do zarządzania bazami danych, które mają wiele podobieństw, ale także kilka kluczowych różnic.  
+
+### **Podobieństwa:**  
+
+- **Proceduralność** – Obie technologie umożliwiają tworzenie procedur składowanych, funkcji, wyzwalaczy i pakietów, co pozwala na bardziej zaawansowaną logikę w bazie danych.  
+- **Transakcyjność** – Zarówno PL/SQL, jak i T-SQL obsługują transakcje, co pozwala na grupowanie wielu operacji na bazie danych w jedną jednostkę pracy.  
+- **Obsługa błędów** – Obie technologie umożliwiają obsługę błędów, choć w inny sposób: w T-SQL używa się `TRY...CATCH`, a w PL/SQL `BEGIN...EXCEPTION...END`.  
+
+### **Różnice:**  
+
+- **Składnia** – Składnia w PL/SQL i T-SQL różni się w pewnych aspektach, np. w PL/SQL do łączenia ciągów znaków używa się `||`, a w T-SQL `+`.  
+- **Obsługa NULL** – W T-SQL porównanie wartości z `NULL` zwraca `NULL`, natomiast w PL/SQL porównanie `NULL` z `NULL` zwraca `TRUE`.  
+- **Funkcje wbudowane** – Oba języki mają różne funkcje wbudowane, np. T-SQL używa `GETDATE()` do pobierania bieżącej daty i godziny, a PL/SQL `SYSDATE`.  
+- **Obsługa bloków kodu** – W PL/SQL bloki kodu definiuje się za pomocą `DECLARE`, `BEGIN`, `EXCEPTION` i `END`, podczas gdy w T-SQL struktura kodu jest prostsza i często korzysta się z `BEGIN...END`.  
