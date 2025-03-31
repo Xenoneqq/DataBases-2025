@@ -838,13 +838,182 @@ Należy przygotować procedury: `p_add_reservation_4`, `p_modify_reservation_sta
 
 # Zadanie 4  - rozwiązanie
 
+W ramach zadania został stworzony wyzwalacz, które odpowiada za aktualizowanie danych w tabeli LOG. Przy każdym dodanym lub modyfikowanym rekordzie informacja o rekordzie zostaje dodane również do tabeli LOG.
+
+
+#### Modyfikacja / Stworzenie rezerwacji
+
 ```sql
-
--- wyniki, kod, zrzuty ekranów, komentarz ...
-
+CREATE OR REPLACE TRIGGER T_RESERVATION_LOG
+AFTER INSERT OR UPDATE ON RESERVATION
+FOR EACH ROW
+BEGIN
+    INSERT INTO LOG (RESERVATION_ID, LOG_DATE, STATUS, NO_TICKETS)
+    VALUES (:NEW.RESERVATION_ID, SYSDATE, :NEW.STATUS, :NEW.NO_TICKETS);
+END;
 ```
 
+W procedurach zostały usunięte fragmenty odpowiadające za dodawanie logów. Teraz to zadanie pełnią stworzone triggery.
 
+#### p_add_reservation_4
+
+```sql
+CREATE OR REPLACE PROCEDURE p_add_reservation_4 (
+    p_trip_id NUMBER,
+    p_person_id NUMBER,
+    p_no_tickets NUMBER
+) AS
+    trip_date DATE;
+    occupied NUMBER;
+    free_spots NUMBER;
+BEGIN
+    BEGIN
+        SELECT TRIP_DATE, MAX_NO_PLACES INTO trip_date, free_spots
+        FROM TRIP WHERE TRIP.TRIP_ID = p_trip_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-10000, 'This trip does not exist...');
+    END;
+
+    IF trip_date < SYSDATE THEN
+        RAISE_APPLICATION_ERROR(-10001, 'Picked an old trip...');
+    END IF;
+
+    SELECT COALESCE(SUM(RESERVATION.NO_TICKETS), 0) INTO occupied
+    FROM RESERVATION
+    WHERE RESERVATION.TRIP_ID = p_trip_id
+    AND RESERVATION.STATUS IN ('N', 'P');
+
+    IF occupied + p_no_tickets > free_spots THEN
+        RAISE_APPLICATION_ERROR(-10002, 'Trip is full...');
+    END IF;
+
+    INSERT INTO RESERVATION (TRIP_ID, PERSON_ID, STATUS, NO_TICKETS)
+    VALUES (p_trip_id, p_person_id, 'N', p_no_tickets);
+
+    COMMIT;
+END;
+```
+
+#### p_modify_reservation_status_4
+
+```sql
+CREATE OR REPLACE PROCEDURE p_modify_reservation_status_4 (
+    p_reservation_id NUMBER,
+    p_status VARCHAR2
+) AS
+    current_status VARCHAR2(1);
+    trip_id NUMBER;
+    trip_date DATE;
+    free_spots NUMBER;
+    occupied NUMBER;
+BEGIN
+    BEGIN
+        SELECT STATUS, TRIP_ID INTO current_status, trip_id
+        FROM RESERVATION
+        WHERE RESERVATION_ID = p_reservation_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-10000, 'Reservation not found...');
+    END;
+
+    IF current_status = 'C' AND p_status IN ('N', 'P') THEN
+        BEGIN
+            SELECT TRIP_DATE, MAX_NO_PLACES INTO trip_date, free_spots
+            FROM TRIP WHERE TRIP_ID = trip_id;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RAISE_APPLICATION_ERROR(-10001, 'Trip not found...');
+        END;
+
+        SELECT COALESCE(SUM(NO_TICKETS), 0) INTO occupied
+        FROM RESERVATION
+        WHERE TRIP_ID = trip_id
+        AND STATUS IN ('N', 'P');
+
+        IF occupied >= free_spots THEN
+            RAISE_APPLICATION_ERROR(-10002, 'No available spots on the trip...');
+        END IF;
+    END IF;
+
+    UPDATE RESERVATION
+    SET STATUS = p_status
+    WHERE RESERVATION_ID = p_reservation_id;
+    
+    COMMIT;
+END;
+```
+
+#### p_modify_reservation_4
+
+```sql
+CREATE OR REPLACE PROCEDURE p_modify_reservation_4 (
+    p_reservation_id NUMBER,
+    p_no_tickets NUMBER
+) AS
+    p_current_no_tickets NUMBER;
+    p_trip_id NUMBER;
+    p_free_spots NUMBER;
+    p_occupied NUMBER;
+BEGIN
+    BEGIN
+        SELECT NO_TICKETS, TRIP_ID INTO p_current_no_tickets, p_trip_id
+        FROM RESERVATION
+        WHERE RESERVATION_ID = p_reservation_id;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20000, 'Reservation not found...');
+    END;
+
+    SELECT MAX_NO_PLACES INTO p_free_spots
+    FROM TRIP
+    WHERE TRIP.TRIP_ID = p_trip_id
+    AND ROWNUM = 1;
+
+    SELECT COALESCE(SUM(NO_TICKETS), 0) INTO p_occupied
+    FROM RESERVATION
+    WHERE TRIP_ID = p_trip_id
+    AND STATUS IN ('N', 'P');
+
+    IF (p_occupied - p_current_no_tickets + p_no_tickets) > p_free_spots THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Not enough available spots on the trip...');
+    END IF;
+
+    UPDATE RESERVATION
+    SET NO_TICKETS = p_no_tickets
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    INSERT INTO LOG (RESERVATION_ID, LOG_DATE, STATUS, NO_TICKETS)
+    SELECT RESERVATION_ID, SYSDATE, STATUS, p_no_tickets
+    FROM RESERVATION
+    WHERE RESERVATION_ID = p_reservation_id;
+
+    COMMIT;
+END;
+```
+
+### Wywołania testowe
+
+- Dodanie nowej rezerwacji:
+```sql
+BEGIN
+    p_add_reservation(1, 3, 2);
+END;
+```
+
+- Modyfikacja statusu rezerwacji:
+```sql
+BEGIN
+    p_modify_reservation_status(27, 'P');
+END;
+```
+
+- Modyfikacja ilości zamówionych biletów
+```sql
+BEGIN
+    p_modify_reservation(41, 5);
+END;
+```
 
 ---
 # Zadanie 5  - triggery
