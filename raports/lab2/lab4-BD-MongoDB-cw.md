@@ -255,15 +255,42 @@ Do sprawozdania należy kompletny zrzut wykonanych/przygotowanych baz danych (ta
 
 ## Zadanie 2  - rozwiązanie
 
-> Wyniki: 
-> 
-> przykłady, kod, zrzuty ekranów, komentarz ...
+### a) Struktura bazy danych
 
-```js
---  ...
-```
+Baza danych będzie posiadać następujące tabele:
 
----
+- **users** - Przechowuje informacje o użytkownikach:
+  - nazwa
+  - mail
+  - hasło (hash)
+  - JWT refresh token
+
+- **auction** - Posiada informacje o obecnie trwających aukcjach. Przechowane informacje to: 
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+
+- **auction.bids** - Przechowuje informacje o osobach które obstawiają swoje pieniądze w celu wygrania aukcji.
+  - user id
+  - wystawiona cena
+  - data wystawienia (milisec)
+
+- **auction-history** - Przechowuje informacje o zakończonych aukcjach.
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - wygrana przez user id
+  - lista bidów
+
+- **log** - przechowuje informacje o operacjach wykonanych w ramach bazy.
 
 Punktacja:
 
