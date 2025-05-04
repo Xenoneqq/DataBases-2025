@@ -264,6 +264,110 @@ Napisz polecenie/zapytanie: Dla każdego klienta pokaż wartość zakupionych pr
 ]  
 ```
 
+## Rozwiązanie
+
+### Używając OrdersInfo
+
+```mongodb
+(function() {
+    const Customers = {};
+
+    db.OrdersInfo.find().forEach(function(order) {
+        let Confections1997 = 0;
+
+        let isFrom1997 = false;
+        const orderDate = order.Dates.OrderDate;
+
+        // STRING - check for 1997
+        if (typeof orderDate === 'string') {
+            isFrom1997 = orderDate.includes('1997');
+        }
+
+        // OBJECT - turn into string then check for 1997
+        else if (orderDate && typeof orderDate === 'object') {
+            const dateStr = orderDate.toString();
+            isFrom1997 = dateStr.includes('1997');
+        }
+
+        if (isFrom1997 === true) {
+            orderDetails = order.OrderDetails;
+            for(let i = 0; i < orderDetails.length; i++){
+                if(orderDetails[i].product.CategoryName == "Confections"){
+                    Confections1997 += orderDetails[i].Value;
+                }
+            }
+
+            Confections1997 = parseFloat(Math.round(Confections1997 * 100) / 100);
+
+            if(Customers[order.Customer.CustomerID] === undefined) {
+                Customers[order.Customer.CustomerID] = {
+                    _id : order.Customer.CustomerID,
+                    CustomerName : order.Customer.CompanyName,
+                    Confections1997 : Confections1997,
+                }
+            }
+            else{
+                Customers[order.Customer.CustomerID].Confections1997 += Confections1997 || 0;
+            }
+        }
+    })
+
+    return Object.values(Customers).sort((a,b) => a._id.localeCompare(b._id));
+})();
+```
+
+### Używając CustomerInfo
+
+```mongodb
+(function() {
+
+    const results = []
+
+    db.CustomerInfo.find().forEach(function(customer){
+        let ConfectionSale97 = 0;
+        const orders = customer.Orders;
+
+        for (let i = 0; i < orders.length; i++) {
+            let isFrom1997 = false;
+            const orderDate = orders[i].Dates.OrderDate;
+
+            // STRING - check for 1997
+            if (typeof orderDate === 'string') {
+                isFrom1997 = orderDate.includes('1997');
+            }
+
+            // OBJECT - turn into string then check for 1997
+            else if (orderDate && typeof orderDate === 'object') {
+                const dateStr = orderDate.toString();
+                isFrom1997 = dateStr.includes('1997');
+            }
+
+            if (isFrom1997) {
+                const orderDetails = orders[i].OrderDetails;
+
+                if (!orderDetails) continue;
+
+                for(let j = 0; j < orderDetails.length; j++){
+                    if(orderDetails[j].product &&
+                       orderDetails[j].product.CategoryName === "Confections") {
+                        ConfectionSale97 += orderDetails[j].Value || 0;
+                    }
+                }
+            }
+        }
+
+        results.push(
+        {
+            _id: customer.CustomerID,
+            CompanyName: customer.CompanyName,
+            ConfectionSale97: ConfectionSale97.toFixed(2)
+        })
+    });
+
+    return results.sort((a,b) => a._id.localeCompare(b._id))
+})();
+```
+
 # d)
 
 Napisz polecenie/zapytanie:  Dla każdego klienta poaje wartość sprzedaży z podziałem na lata i miesiące
