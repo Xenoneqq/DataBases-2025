@@ -6,6 +6,7 @@
 ---
 
 **Imiona i nazwiska autorów:**
+Mateusz Pawliczek, Filip Malejki, Bartosz Ludwin
 
 --- 
 
@@ -89,6 +90,97 @@ stwórz kolekcję  `OrdersInfo`  zawierającą następujące dane o zamówieniac
 ]  
 ```
 
+## Rozwiązanie
+
+Rozwiązanie tego zadania obejmowało znalezienie dla każdego rekordu z order informacji o pracownikach, klientach oraz zamówieniach oraz odpowiednie ich pogrupowanie i dodanie do nowo stworzonej kolekcji.
+
+#### Inicjalizacja kolekcji
+
+```mongodb
+db.createCollection("OrdersInfo")
+```
+
+#### Wstawienie danych do kolekcji
+
+```mongodb
+db.orders.find().forEach(function(order) {
+    const EmployeeData = db.employees.findOne({EmployeeID : order.EmployeeID});
+    const CustomerData = db.customers.findOne({CustomerID : order.CustomerID})
+    const Dates = {
+        "OrderDate" : order.OrderDate,
+        "RequiredDate" : order.RequiredDate,
+    }
+    const Freight = order.Freight
+    let OrderTotal = 0;
+    db.orderdetails.find({OrderID : order.OrderID}).forEach(function(orderdetail) {
+        const value = (orderdetail.Quantity * orderdetail.UnitPrice) * (1- orderdetail.Discount);
+        OrderTotal += value;
+    });
+    const Shipper = db.shippers.findOne({ShipperID : order.ShipVia})
+
+    const Customer = {
+        "CustomerID": CustomerData.CustomerID,
+        "CompanyName": CustomerData.CompanyName,
+        "City": CustomerData.City,
+        "Country": CustomerData.Country,
+    }
+
+    const Employee = {
+        "EmployeeID":EmployeeData.EmployeeID,
+        "FirstName":EmployeeData.FirstName,
+        "LastName":EmployeeData.LastName,
+        "Title":EmployeeData.Title,
+    }
+
+    const OrderDetails = [];
+    db.orderdetails.find({OrderID : order.OrderID}).forEach( function(orderdetail) {
+        const productSearch = db.products.findOne({ProductID : orderdetail.ProductID})
+        const category = db.categories.findOne({CategoryID : productSearch.CategoryID})
+        const product = {
+            "ProductID" : productSearch.ProductID,
+            "ProductName" : productSearch.ProductName,
+            "QuantityPerUnity" : productSearch.QuantityPerUnit,
+            "CategoryID" : productSearch.CategoryID,
+            "CategoryName" : category.CategoryName,
+        }
+        OrderDetails.push({
+            "UnitPrice": orderdetail.UnitPrice,
+            "Quantity": orderdetail.Quantity,
+            "Discount": orderdetail.Discount,
+            "Value": (orderdetail.UnitPrice * orderdetail.Quantity) - (1 - orderdetail.Discount),
+            "product" : product,
+        })
+    });
+
+    const Shipment = {
+        "Shipper" : Shipper,
+        "ShipName" : order.ShipName,
+        "ShipAddress" : order.ShipAddress,
+        "ShipCity" : order.ShipCity,
+        "ShipCountry" : order.ShipCountry,
+    }
+
+    db.OrdersInfo.insertOne(
+        {
+            "OrderID":order.OrderID,
+
+            "Customer" : Customer,
+
+            "Employee" : Employee,
+
+            "Dates" : Dates,
+
+            "OrderDetails" : OrderDetails,
+
+            "Freight" : Freight,
+            "OrderTotal": OrderTotal,
+
+            "Shipment" : Shipment,
+        }
+    )
+})
+```
+
 
 # b)
 
@@ -111,6 +203,42 @@ stwórz kolekcję  `CustomerInfo`  zawierającą następujące dane kazdym klenc
 
 		  
 ]  
+```
+
+## Rozwiązanie
+
+#### Inicjalizacja kolekcji
+```mongodb
+db.createCollection("CustomerInfo")
+```
+
+#### Wstawienie danych do kolekcji
+
+```mongodb
+db.customers.find().forEach(function(customer) {
+    const Orders = [];
+    OrdersData = db.OrdersInfo.find({"Customer.CustomerID" : customer.CustomerID}).forEach(function (order) {
+        Orders.push({
+            "OrderID" : order.OrderID,
+            "Employee" : order.Employee,
+            "Dates" : order.Dates,
+            "OrderDetails" : order.OrderDetails,
+            "Freight" : order.Freight,
+            "OrderTotal" : order.OrderTotal,
+            "Shipment" : order.Shipment,
+        })
+    });
+
+    db.CustomerInfo.insertOne({
+        "CustomerID" : customer.CustomerID,
+        "CompanyName" : customer.CompanyName,
+        "City" : customer.City,
+        "Country" : customer.Country,
+
+        "Orders":Orders,
+    })
+
+})
 ```
 
 # c) 
