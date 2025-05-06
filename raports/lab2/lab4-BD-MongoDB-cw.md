@@ -510,6 +510,248 @@ Spróbuj napisać to zapytanie wykorzystując
 ]  
 ```
 
+## Rozwiązanie
+### Używając oryginalnych kolekcji
+```mongodb
+db.orders.aggregate([
+
+  // Połącz z orderdetails i policz lineValue i wydziel rok/miesiąc
+  { $lookup: {
+      from:      "orderdetails",
+      localField: "OrderID",
+      foreignField:"OrderID",
+      as:        "details"
+    }
+  },
+  { $unwind: "$details" },
+  { $project: {
+      CustomerID: 1,
+      lineValue: {
+        $multiply: [
+          "$details.Quantity",
+          "$details.UnitPrice",
+          { $subtract: [1, "$details.Discount"] }
+        ]
+      },
+      year:  { $year:  "$OrderDate" },
+      month: { $month: "$OrderDate" }
+    }
+  },
+
+  //  Grupuj po CustomerID, roku i miesiącu
+  { $group: {
+      _id: {
+        CustomerID: "$CustomerID",
+        year:       "$year",
+        month:      "$month"
+      },
+      totalSales: { $sum: "$lineValue" }
+    }
+  },
+
+  // Dołącz nazwę klienta
+  { $lookup: {
+      from:         "customers",
+      localField:   "_id.CustomerID",
+      foreignField: "CustomerID",
+      as:           "cust"
+    }
+  },
+  { $unwind: "$cust" },
+
+  // Zagnieżdż Sale w tablicy
+  { $group: {
+      _id:           "$_id.CustomerID",
+      CustomerName:  { $first: "$cust.CompanyName" },
+      Sale: {
+        $push: {
+          Year:  "$_id.year",
+          Month: "$_id.month",
+          Total: "$totalSales"
+        }
+      }
+    }
+  },
+
+  // Projection i sortowanie
+  { $project: {
+      _id:         0,
+      CustomerID:  "$_id",
+      CompanyName: "$CustomerName",
+      Sale:        1
+    }
+  },
+  { $sort: { CustomerID: 1, Sale: 1 } }
+
+]);
+```
+
+### Używając kolekcji OrdersInfo
+
+```mongodb
+db.OrdersInfo.aggregate([
+
+  // Rozwiń każdą pozycję
+  {
+    $unwind: {
+      path: "$Orderdetails",
+      preserveNullAndEmptyArrays: true
+    }
+  },
+
+  // Wyciągnij customer, lineValue, rok i miesiąc
+  {
+    $project: {
+      CustomerID:   "$Customer.CustomerID",
+      CompanyName:  "$Customer.CompanyName",
+      lineValue:    "$OrderTotal",
+      year:         { $year:  "$Dates.OrderDate" },
+      month:        { $month: "$Dates.OrderDate" }
+    }
+  },
+
+  // Grupuj po kliencie, roku i miesiącu
+  {
+    $group: {
+      _id: {
+        CustomerID:  "$CustomerID",
+        CompanyName: "$CompanyName",
+        year:        "$year",
+        month:       "$month"
+      },
+      totalSales: { $sum: "$lineValue" }
+    }
+  },
+
+  // Zagnieżdżamy tablicę Sale
+  {
+    $group: {
+      _id: {
+        CustomerID:  "$_id.CustomerID",
+        CompanyName: "$_id.CompanyName"
+      },
+      Sale: {
+        $push: {
+          Year:  "$_id.year",
+          Month: "$_id.month",
+          Total: "$totalSales"
+        }
+      }
+    }
+  },
+
+  // Projection i sortowanie
+  {
+    $project: {
+      _id:         0,
+      CustomerID:  "$_id.CustomerID",
+      CompanyName: "$_id.CompanyName",
+      Sale:        1
+    }
+  },
+  { $sort: { CustomerID: 1, Sale: 1} }
+
+]);
+```
+
+### Używając kolekcji CustomerInfo
+
+```mongodb
+db.CustomerInfo.aggregate([
+
+  // Rozwiń tablicę Orders
+  {
+    $unwind: {
+      path: "$Orders",
+      preserveNullAndEmptyArrays: true
+    }
+  },
+
+  // Wyciągamy potrzebne pola
+  {
+    $project: {
+      CustomerID:   1,
+      CompanyName:  1,
+      lineValue:    "$Orders.OrderTotal",
+      year:         { $year:  "$Orders.Dates.OrderDate" },
+      month:        { $month: "$Orders.Dates.OrderDate" }
+    }
+  },
+
+  // Grupujemy
+  {
+    $group: {
+      _id: {
+        CustomerID:  "$CustomerID",
+        CompanyName: "$CompanyName",
+        year:        "$year",
+        month:       "$month"
+      },
+      totalSales: { $sum: "$lineValue" }
+    }
+  },
+
+  // Zagnieżdżamy Sale
+  {
+    $group: {
+      _id: {
+        CustomerID:  "$_id.CustomerID",
+        CompanyName: "$_id.CompanyName"
+      },
+      Sale: {
+        $push: {
+          Year:  "$_id.year",
+          Month: "$_id.month",
+          Total: "$totalSales"
+        }
+      }
+    }
+  },
+
+  // Projection i sortowanie
+  {
+    $project: {
+      _id:         0,
+      CustomerID:  "$_id.CustomerID",
+      CompanyName: "$_id.CompanyName",
+      Sale:        1
+    }
+  },
+  { $sort: { CustomerID: 1, Sale: 1 } }
+
+]);
+```
+*Uwaga: w ostatnim zapytaniu jest o 2 wyniki więcej. Dzieje się tak ponieważ dwóch klientów nic nie zamawiało, więc nie zostali uwzględnieni w Orders czy OrdersInfo. W poleceniu z CustomerInfo wyświetlają się nastepująco:*
+```json
+[
+  {
+    "CompanyName": "Paris spécialités",
+    "CustomerID": "PARIS",
+    "Sale": [
+      {
+        "Year": null,
+        "Month": null,
+        "Total": 0
+      }
+    ]
+  }
+],
+
+[
+  {
+    "CompanyName": "FISSA Fabrica Inter. Salchichas S.A.",
+    "CustomerID": "FISSA",
+    "Sale": [
+      {
+        "Year": null,
+        "Month": null,
+        "Total": 0
+      }
+    ]
+  }
+]
+```
+
 # e)
 
 Załóżmy że pojawia się nowe zamówienie dla klienta 'ALFKI',  zawierające dwa produkty 'Chai' oraz "Ikura"
