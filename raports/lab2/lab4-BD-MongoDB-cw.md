@@ -781,27 +781,6 @@ UWAGA:
 W raporcie należy zamieścić kod poleceń oraz uzyskany rezultat, np wynik  polecenia `db.kolekcka.fimd().limit(2)` lub jego fragment
 
 
-## Zadanie 1  - rozwiązanie
-
-> Wyniki: 
-> 
-> przykłady, kod, zrzuty ekranów, komentarz ...
-
-a)
-
-```js
---  ...
-```
-
-b)
-
-
-```js
---  ...
-```
-
-....
-
 # Zadanie 2 - modelowanie danych
 
 
@@ -841,49 +820,320 @@ Do sprawozdania należy kompletny zrzut wykonanych/przygotowanych baz danych (ta
 
 ## Zadanie 2  - rozwiązanie
 
-### a) Struktura bazy danych
+---
+## Tworzenie DBs: (to będzie do wywalenia)
+#### Wariant 1
+```mongoDB
+// 1. Przełączamy się na bazę
+use auctionDB1;
 
-Baza danych będzie posiadać następujące tabele:
+// 2. Kolekcja users
+db.createCollection("users", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["username","email","passwordHash"],
+      properties: {
+        username:   { bsonType: "string", description: "nazwa użytkownika, obowiązkowe" },
+        email:      { bsonType: "string", pattern:   "^.+@.+\\..+$", description: "poprawny e-mail" },
+        passwordHash:{bsonType:"string", description:"hash hasła"},
+        refreshTokens: {
+          bsonType: "array",
+          items: {
+            bsonType: "object",
+            required: ["token","issuedAt"],
+            properties: {
+              token:    { bsonType: "string" },
+              issuedAt: { bsonType: "date" }
+            }
+          }
+        }
+      }
+    }
+  }
+});
 
-- **users** - Przechowuje informacje o użytkownikach:
-  - nazwa
-  - mail
-  - hasło (hash)
-  - JWT refresh token (pominięty w implementacji ze względu na brak backendu)
+// 3. Kolekcja auction (meta dane aukcji)
+db.createCollection("auction", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["title","startDate","endDate","status"],
+      properties: {
+        title:       { bsonType: "string" },
+        category:    { bsonType: "string" },
+        description: { bsonType: "string" },
+        media: {
+          bsonType: "array",
+          items: { bsonType: "string", pattern: "^https?://" }
+        },
+        startDate:   { bsonType: "date" },
+        endDate:     { bsonType: "date" },
+        status:      { enum: ["active","closed","scheduled"] }
+      }
+    }
+  }
+});
 
-- **auction** - Posiada informacje o obecnie trwających aukcjach. Przechowane informacje to: 
-  - id aukcji
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu
-  - data początku
-  - data zakończenia
+// 4. Kolekcja auction.bids
+db.createCollection("auction.bids", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["auctionId","userId","amount","placedAt"],
+      properties: {
+        auctionId: { bsonType: "objectId" },
+        userId:    { bsonType: "objectId" },
+        amount:    { bsonType: "double", minimum: 0 },
+        placedAt:  { bsonType: "date" }
+      }
+    }
+  }
+});
 
-- **auction.bids** - Przechowuje informacje o osobach które obstawiają swoje pieniądze w celu wygrania aukcji.
-  - user id
-  - wystawiona cena
-  - data wystawienia (milisec)
+// 5. Kolekcja auction.history
+db.createCollection("auction.history", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["auctionId","winnerUserId","finalPrice","bids","closedAt"],
+      properties: {
+        auctionId:    { bsonType: "objectId" },
+        winnerUserId: { bsonType: "objectId" },
+        finalPrice:   { bsonType: "double", minimum: 0 },
+        bids: {
+          bsonType: "array",
+          items: { bsonType: "objectId" }
+        },
+        closedAt:     { bsonType: "date" }
+      }
+    }
+  }
+});
 
-- **auction-history** - Przechowuje informacje o zakończonych aukcjach.
-  - id aukcji
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu
-  - data początku
-  - data zakończenia
-  - wygrana przez user id
-  - lista bidów
+// 6. Kolekcja log
+db.createCollection("log", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["entity","entityId","action","timestamp"],
+      properties: {
+        entity:    { enum: ["user","auction","bid","history"] },
+        entityId:  { bsonType: "objectId" },
+        action:    { bsonType: "string" },
+        timestamp: { bsonType: "date" },
+        meta:      { bsonType: "object" }
+      }
+    }
+  }
+});
+```
+#### Wariant 2
+```mongoDB
+// 1. Przełączamy się na bazę
+use auctionDB2;
 
-- **log** - przechowuje informacje o operacjach wykonanych w ramach bazy.
+// 2. Kolekcja users
+db.createCollection("users", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["username","email","passwordHash"],
+      properties: {
+        username:   { bsonType: "string" },
+        email:      { bsonType: "string", pattern: "^.+@.+\\..+$" },
+        passwordHash:{bsonType:"string"}
+      }
+    }
+  }
+});
 
+// 3. Kolekcja auction (ze zagnieżdżonymi bids)
+db.createCollection("auction", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["title","startDate","endDate","status","bids"],
+      properties: {
+        title:       { bsonType: "string" },
+        category:    { bsonType: "string" },
+        description: { bsonType: "string" },
+        media: {
+          bsonType: "array",
+          items: { bsonType: "string", pattern: "^https?://" }
+        },
+        startDate:   { bsonType: "date" },
+        endDate:     { bsonType: "date" },
+        status:      { enum: ["active","closed","scheduled"] },
+        bids: {
+          bsonType: "array",
+          items: {
+            bsonType: "object",
+            required: ["userId","amount","placedAt"],
+            properties: {
+              userId:   { bsonType: "objectId" },
+              amount:   { bsonType: "double", minimum: 0 },
+              placedAt: { bsonType: "date" }
+            }
+          }
+        }
+      }
+    }
+  }
+});
 
-### komentarz do struktury danych
+// 4. Kolekcja auction.history (z embedowanymi bidami)
+db.createCollection("auction.history", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["auctionId","bids","closedAt","winnerUserId"],
+      properties: {
+        auctionId:    { bsonType: "objectId" },
+        title:        { bsonType: "string" },
+        bids: {
+          bsonType: "array",
+          items: {
+            bsonType: "object",
+            required: ["userId","amount","placedAt"],
+            properties: {
+              userId:   { bsonType: "objectId" },
+              amount:   { bsonType: "double" },
+              placedAt: { bsonType: "date" }
+            }
+          }
+        },
+        closedAt:     { bsonType: "date" },
+        winnerUserId: { bsonType: "objectId" },
+        status:       { enum: ["active","closed","scheduled"] }
+      }
+    }
+  }
+});
 
-- Przechowywanie ofert `bids` w kolekcji `action` sprawia, że wszystkie powiązane z aukcją transakcje (osoby do niej przypisane), są natychmiastowo związane z daną aukcją. Dodatkowo, w przypadku usunięcia aukcji, usuwane są również osoby przypisane do tej aukcji.
+// 5. Kolekcja log
+db.createCollection("log", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["action","timestamp"],
+      properties: {
+        action:    { bsonType: "string" },
+        timestamp: { bsonType: "date" },
+        meta:      { bsonType: "object" }
+      }
+    }
+  }
+});
+```
+#### Wariant 3:
+```mongoDB
+// 1. Przełączamy się na bazę
+use auctionDB3;
 
-- Tabele taka jak `log` mogłaby działąć tylko z użyciem procedur lub triggerów, których czysty mongodb nie obsługuje. Implementacja takich mechanizmów musiałaby zostać zrealizowana w ramach backendu pisanego w node.js / flusk / dowolnym innym backendowym środowisku. W związku z tym tabela `log` zostanie pominięta w poniższej implementacji.
+// 2. Kolekcja users
+db.createCollection("users", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["username","email","passwordHash"],
+      properties: {
+        username:    { bsonType: "string" },
+        email:       { bsonType: "string", pattern: "^.+@.+\\..+$" },
+        passwordHash:{ bsonType: "string" }
+      }
+    }
+  }
+});
+
+// 3. Kolekcja auction (meta + bidsPreview)
+db.createCollection("auction", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["title","startDate","endDate","status","bidsPreview"],
+      properties: {
+        title:       { bsonType: "string" },
+        category:    { bsonType: "string" },
+        description: { bsonType: "string" },
+        media: {
+          bsonType: "array",
+          items: { bsonType: "string" }
+        },
+        startDate:   { bsonType: "date" },
+        endDate:     { bsonType: "date" },
+        status:      { enum: ["active","closed","scheduled"] },
+        bidsPreview: {
+          bsonType: "array",
+          items: {
+            bsonType: "object",
+            required: ["userId","amount","placedAt"],
+            properties: {
+              userId:   { bsonType: "objectId" },
+              amount:   { bsonType: "double" },
+              placedAt: { bsonType: "date" }
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+// 4. Kolekcja auction.bids (pełna historia)
+db.createCollection("auction.bids", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["auctionId","userId","amount","placedAt"],
+      properties: {
+        auctionId: { bsonType: "objectId" },
+        userId:    { bsonType: "objectId" },
+        amount:    { bsonType: "double", minimum: 0 },
+        placedAt:  { bsonType: "date" }
+      }
+    }
+  }
+});
+
+// 5. Kolekcja auction.history
+db.createCollection("auction.history", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["auctionId","winnerUserId","bids","closedAt"],
+      properties: {
+        auctionId:    { bsonType: "objectId" },
+        winnerUserId: { bsonType: "objectId" },
+        finalPrice:   { bsonType: "double" },
+        bids: {
+          bsonType: "array",
+          items: { bsonType: "objectId" }
+        },
+        closedAt:     { bsonType: "date" }
+      }
+    }
+  }
+});
+
+// 6. Kolekcja log
+db.createCollection("log", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["entity","action","timestamp"],
+      properties: {
+        entity:    { enum: ["user","auction","bid"] },
+        action:    { bsonType: "string" },
+        timestamp: { bsonType: "date" },
+        meta:      { bsonType: "object" }
+      }
+    }
+  }
+});
+
+```
+---
 
 ### Ładowanie danych z dumpa
 
@@ -907,88 +1157,186 @@ Aby załadować dane z dumpa bazy `AuctionDatabase`, użyj jednej z poniższych 
    ```
    - Usuwa istniejące dane przed załadowaniem nowych.
 
-### Przykładowe dane do INSERT
+---
 
-#### wstawianie do User
+## Wariant 1: Znormalizowany (referencje)
 
-Informacje do wstawiania (backend powinien je weryfikować)
-- UserID nie powinno się powtarzać
-- Email powinien być unikatowy
-- Hasło jest hashowane
+### Struktura:
+- **users** – Przechowuje informacje o użytkownikach.
+  - nazwa
+  - e-mail
+  - hasło (hash)
+  - lista refresh tokenów
 
-```mongodb
-db.users.insertOne({
-    UserID:0,
-    Email:"nicemail@gmail.com",
-    Password:"uu3451sfgias",
-})
-```
+- **auction** – Przechowuje dane o aktywnych aukcjach.
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu (lista URL)
+  - data początku
+  - data zakończenia
+  - status akcji (np. active / closed)
 
-#### wstawianie do Auction
+- **auction.bids** – Przechowuje wszystkie oferty (bids) na aukcje jako osobna kolekcja.
+  - id aukcji (referencja do `auction`)
+  - user id (referencja do `users`)
+  - wystawiona cena
+  - data wystawienia (milisekundy / ISODate)
 
-- AuctionID nie może się powtarzać
-- Item media zawiera listę zdjęć przedmiotu
-- Bids powinny być ustawione rosnąco względem obstawianej ceny (inaczej mówiąc największy Bid jest na końcu listy)
+- **auction.history** – Przechowuje informacje o zakończonych aukcjach.
+  - id aukcji (referencja)
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - wygrana przez user id (referencja)
+  - lista bidów (referencje do `auction.bids`)
+  - status akcji
 
-```mongodb
-db.auction.insertOne({
-    AuctionID:0,
-    Name:"Auction Name",
-    Category:"Item Category",
-    ItemDescription:"Item Description",
-    ItemMedia:[
-      "Link to title image",
-      "Link to media one",
-      "Link to media two",
-      "Link to media three",
-      ...
-    ],
-    StartDate:"2025-05-03T19:54:00.123Z",
-    EndDate:"2026-01-01T19:54:00.123Z",
-    Bids:[
-        {UserID:0, BidUSD:10, BidTime:"2025-05-03T19:54:00.123Z"},
-        {UserID:1, BidUSD:20, BidTime:"2025-05-03T19:54:00.223Z"},
-        {UserID:2, BidUSD:30, BidTime:"2025-05-03T19:54:00.333Z"},
-        ...
-    ]
-})
-```
+- **log** – Przechowuje informacje o operacjach wykonanych w ramach bazy.
+  - typ encji (np. user / auction / bid)
+  - id encji
+  - akcja (np. create / update / delete)
+  - data wykonania
+  - dodatkowe dane operacji (meta)
 
-#### wstawianie do Auction-History
+### Zalety:
+- Lepsza skalowalność – dane można łatwo rozproszyć między kolekcje.
+- Redukcja duplikacji danych (np. opis aukcji nie jest powielany w historii).
+- Ułatwia kontrolę spójności przy użyciu walidacji i relacji.
 
-- AuctionID nie może się powtarzać
-- Item media zawiera listę zdjęć przedmiotu
-- WinnerID zawiera id zwycięzcy aukcji (jest to ID usera na ostatnim miejscu w tabeli bids)
+### Wady:
+- Więcej zapytań i joinów (przez `$lookup`) – większe obciążenie przy agregacjach.
+- Trudniejsze do wdrożenia w systemach z wysoką liczbą zapytań.
+- Czasochłonniejsze dla prostych operacji.
 
-```mongodb
-db.auction-history.insertOne({
-    AuctionID:0,
-    Name:"Auction Name",
-    Category:"Item Category",
-    ItemDescription:"Item Description",
-    ItemMedia:[
-      "Link to title image",
-      "Link to media one",
-      "Link to media two",
-      "Link to media three",
-      ...
-    ],
-    StartDate:"2025-05-03T19:54:00.123Z",
-    EndDate:"2026-01-01T19:54:00.123Z",
-    WinnerID:2,
-    Bids:[
-        {UserID:0, BidUSD:10, BidTime:"2025-05-03T19:54:00.123Z"},
-        {UserID:1, BidUSD:20, BidTime:"2025-05-03T19:54:00.223Z"},
-        {UserID:2, BidUSD:30, BidTime:"2025-05-03T19:54:00.333Z"},
-        ...
-    ]
-})
-```
+### Przykładowe operacje:
+TODO
+---
 
-### Możliwe zapytania i operacje na bazie danych
+## Wariant 2: Zagnieżdżone dokumenty (denormalizacja)
 
-Tutaj będą zapytania / operacje
+- **users**
+  - nazwa
+  - e-mail
+  - hasło (hash)
+  - lista refresh tokenów
 
+- **auction** – Przechowuje dane o aukcji **wraz z ofertami**.
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - status akcji
+  - bids (tablica zagnieżdżonych dokumentów)
+    - user id
+    - wystawiona cena
+    - data wystawienia
+
+- **auction.history** – Zakończone aukcje wraz z pełną historią bidów.
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - wygrana przez user id
+  - lista bidów (wbudowana tablica obiektów)
+    - user id
+    - wystawiona cena
+    - data wystawienia
+  - status akcji
+
+- **log**
+  - typ operacji
+  - czas
+  - meta
+  - nazwa kolekcji / dokumentu
+
+
+### Zalety:
+- Bardzo szybki dostęp do pełnych danych aukcji w jednym zapytaniu.
+- Mniejsza liczba joinów i operacji agregujących oznacza lepszą wydajność w prostych przypadkach.
+- Dobra współpraca tego rozwiązania z MongoDB (pojedyńczy plik JSON zamiast kilku kolekcji).
+
+### Wady:
+- Duplikacja danych może powodować trudniejsze aktualizacje danych.
+- Dokumenty mogą szybko osiągnąć limit 16MB.
+
+### Przykładowe operacje:
+TODO
+
+---
+
+## Wariant 3: połączenie powyższych (embedowanie + referencje)
+
+- **users**
+  - nazwa
+  - e-mail
+  - hasło (hash)
+  - lista refresh tokenów
+
+- **auction**
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - status akcji
+  - bidsPreview (ostatnie 5–10 ofert)
+    - user id
+    - wystawiona cena
+    - data wystawienia
+
+- **auction.bids** – Wszystkie oferty jako osobna kolekcja (pełna historia).
+  - id aukcji
+  - user id
+  - wystawiona cena
+  - data wystawienia
+
+- **auction.history**
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - wygrana przez user id
+  - lista bidów (referencje do dokumentów w `auction.bids`)
+  - status akcji
+
+- **log**
+  - typ operacji
+  - czas
+  - obiekt (np. aukcja, bid)
+  - identyfikator obiektu
+  - dane dodatkowe
+
+
+### Zalety:
+- Łączy zalety obu podejść – szybki dostęp do najważniejszych danych + pełna historia w osobnej kolekcji.
+- Optymalizacja pod kątem wydajności (przeglądanie aukcji) i elastyczności (analiza historii).
+- Umożliwia budowanie funkcji typu "ostatnie oferty" bez konieczności pełnego przeszukiwania bazy.
+
+### Wady:
+- Większa złożoność implementacyjna (dane częściowo zagnieżdżone, częściowo referencyjne).
+- Wymaga dbałości o spójność między kolekcjami (np. bidsPreview vs auction.bids).
+- Trudniejsze w debugowaniu i utrzymaniu.
+
+### Przykładowe operacje:
+TODO
+
+---
 
 Punktacja:
 
