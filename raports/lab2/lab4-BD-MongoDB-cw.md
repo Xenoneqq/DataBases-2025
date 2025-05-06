@@ -849,7 +849,7 @@ Baza danych będzie posiadać następujące tabele:
   - nazwa
   - mail
   - hasło (hash)
-  - JWT refresh token
+  - JWT refresh token (pominięty w implementacji ze względu na brak backendu)
 
 - **auction** - Posiada informacje o obecnie trwających aukcjach. Przechowane informacje to: 
   - id aukcji
@@ -877,6 +877,118 @@ Baza danych będzie posiadać następujące tabele:
   - lista bidów
 
 - **log** - przechowuje informacje o operacjach wykonanych w ramach bazy.
+
+
+### komentarz do struktury danych
+
+- Przechowywanie ofert `bids` w kolekcji `action` sprawia, że wszystkie powiązane z aukcją transakcje (osoby do niej przypisane), są natychmiastowo związane z daną aukcją. Dodatkowo, w przypadku usunięcia aukcji, usuwane są również osoby przypisane do tej aukcji.
+
+- Tabele taka jak `log` mogłaby działąć tylko z użyciem procedur lub triggerów, których czysty mongodb nie obsługuje. Implementacja takich mechanizmów musiałaby zostać zrealizowana w ramach backendu pisanego w node.js / flusk / dowolnym innym backendowym środowisku. W związku z tym tabela `log` zostanie pominięta w poniższej implementacji.
+
+### Ładowanie danych z dumpa
+
+Aby załadować dane z dumpa bazy `AuctionDatabase`, użyj jednej z poniższych komend:
+
+1. **Podstawowe ładowanie:**
+   ```bash
+   mongorestore ./AuctionDatabase
+   ```
+   - Ładuje dane z lokalnego dumpa do domyślnej instancji MongoDB.
+
+2. **Ładowanie z pełnym connection stringiem:**
+   ```bash
+   mongorestore --uri="mongodb://localhost:27017" --db=AuctionDatabase ./AuctionDatabase
+   ```
+   - Określa połączenie i bazę danych, do której mają trafić dane.
+
+3. **Nadpisanie istniejącej bazy danych:**
+   ```bash
+   mongorestore --uri="mongodb://localhost:27017" --drop --db=AuctionDatabase ./AuctionDatabase
+   ```
+   - Usuwa istniejące dane przed załadowaniem nowych.
+
+### Przykładowe dane do INSERT
+
+#### wstawianie do User
+
+Informacje do wstawiania (backend powinien je weryfikować)
+- UserID nie powinno się powtarzać
+- Email powinien być unikatowy
+- Hasło jest hashowane
+
+```mongodb
+db.users.insertOne({
+    UserID:0,
+    Email:"nicemail@gmail.com",
+    Password:"uu3451sfgias",
+})
+```
+
+#### wstawianie do Auction
+
+- AuctionID nie może się powtarzać
+- Item media zawiera listę zdjęć przedmiotu
+- Bids powinny być ustawione rosnąco względem obstawianej ceny (inaczej mówiąc największy Bid jest na końcu listy)
+
+```mongodb
+db.auction.insertOne({
+    AuctionID:0,
+    Name:"Auction Name",
+    Category:"Item Category",
+    ItemDescription:"Item Description",
+    ItemMedia:[
+      "Link to title image",
+      "Link to media one",
+      "Link to media two",
+      "Link to media three",
+      ...
+    ],
+    StartDate:"2025-05-03T19:54:00.123Z",
+    EndDate:"2026-01-01T19:54:00.123Z",
+    Bids:[
+        {UserID:0, BidUSD:10, BidTime:"2025-05-03T19:54:00.123Z"},
+        {UserID:1, BidUSD:20, BidTime:"2025-05-03T19:54:00.223Z"},
+        {UserID:2, BidUSD:30, BidTime:"2025-05-03T19:54:00.333Z"},
+        ...
+    ]
+})
+```
+
+#### wstawianie do Auction-History
+
+- AuctionID nie może się powtarzać
+- Item media zawiera listę zdjęć przedmiotu
+- WinnerID zawiera id zwycięzcy aukcji (jest to ID usera na ostatnim miejscu w tabeli bids)
+
+```mongodb
+db.auction-history.insertOne({
+    AuctionID:0,
+    Name:"Auction Name",
+    Category:"Item Category",
+    ItemDescription:"Item Description",
+    ItemMedia:[
+      "Link to title image",
+      "Link to media one",
+      "Link to media two",
+      "Link to media three",
+      ...
+    ],
+    StartDate:"2025-05-03T19:54:00.123Z",
+    EndDate:"2026-01-01T19:54:00.123Z",
+    WinnerID:2,
+    Bids:[
+        {UserID:0, BidUSD:10, BidTime:"2025-05-03T19:54:00.123Z"},
+        {UserID:1, BidUSD:20, BidTime:"2025-05-03T19:54:00.223Z"},
+        {UserID:2, BidUSD:30, BidTime:"2025-05-03T19:54:00.333Z"},
+        ...
+    ]
+})
+```
+
+### Możliwe zapytania i operacje na bazie danych
+
+Tutaj będą zapytania / operacje
+
 
 Punktacja:
 
