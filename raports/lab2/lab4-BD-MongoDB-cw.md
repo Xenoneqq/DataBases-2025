@@ -766,7 +766,202 @@ Napisz polecenie
 - aktualizując kolekcję `OrderInfo`
 - aktualizując kolekcję `CustomerInfo`
 
+Załóżmy, że pojawia się nowe zamówienie dla klienta `ALFKI`, zawierające dwa produkty: `Chai` oraz `Ikura`. Pozostałe dane są uzupełnione przykładowo.
+
+### Aktualizacja kolekcji `orders` i `orderdetails`
+
+```javascript
+const newOrderID = db.orders.find().sort({OrderID: -1}).limit(1).toArray()[0].OrderID + 1;
+const customerData = db.customers.findOne({CustomerID: "ALFKI"});
+const chaiProduct = db.products.findOne({ProductName: "Chai"});
+const ikuraProduct = db.products.findOne({ProductName: "Ikura"});
+const shipperID = 1;
+
+db.orders.insertOne({
+  OrderID: newOrderID,
+  CustomerID: "ALFKI",
+  EmployeeID: 5,
+  OrderDate: new Date(),
+  RequiredDate: new Date(new Date().setDate(new Date().getDate() + 7)),
+  ShippedDate: null,
+  ShipVia: shipperID,
+  Freight: 15.50,
+  ShipName: customerData.CompanyName,
+  ShipAddress: customerData.Address,
+  ShipCity: customerData.City,
+  ShipRegion: customerData.Region,
+  ShipPostalCode: customerData.PostalCode,
+  ShipCountry: customerData.Country
+});
+
+db.orderdetails.insertMany([
+  {
+    OrderID: newOrderID,
+    ProductID: chaiProduct.ProductID,
+    UnitPrice: chaiProduct.UnitPrice,
+    Quantity: 5,
+    Discount: 0.05
+  },
+  {
+    OrderID: newOrderID,
+    ProductID: ikuraProduct.ProductID,
+    UnitPrice: ikuraProduct.UnitPrice,
+    Quantity: 3,
+    Discount: 0.10
+  }
+]);
+```
+
+### Aktualizacja kolekcji `OrdersInfo`
+
+```javascript
+const newOrder = db.orders.findOne({OrderID: newOrderID});
+const orderDetails = db.orderdetails.find({OrderID: newOrderID}).toArray();
+const customer = db.customers.findOne({CustomerID: newOrder.CustomerID});
+const employee = db.employees.findOne({EmployeeID: newOrder.EmployeeID});
+const shipper = db.shippers.findOne({ShipperID: newOrder.ShipVia});
+
+const orderDetailsInfo = [];
+let orderTotal = 0;
+
+orderDetails.forEach(function(detail) {
+  const product = db.products.findOne({ProductID: detail.ProductID});
+  const category = db.categories.findOne({CategoryID: product.CategoryID});
+  const value = detail.UnitPrice * detail.Quantity * (1 - detail.Discount);
+  orderTotal += value;
+
+  orderDetailsInfo.push({
+    UnitPrice: detail.UnitPrice,
+    Quantity: detail.Quantity,
+    Discount: detail.Discount,
+    Value: value,
+    product: {
+      ProductID: product.ProductID,
+      ProductName: product.ProductName,
+      QuantityPerUnit: product.QuantityPerUnit,
+      CategoryID: product.CategoryID,
+      CategoryName: category.CategoryName
+    }
+  });
+});
+
+db.OrdersInfo.insertOne({
+  OrderID: newOrder.OrderID,
+  Customer: {
+    CustomerID: customer.CustomerID,
+    CompanyName: customer.CompanyName,
+    City: customer.City,
+    Country: customer.Country
+  },
+  Employee: {
+    EmployeeID: employee.EmployeeID,
+    FirstName: employee.FirstName,
+    LastName: employee.LastName,
+    Title: employee.Title
+  },
+  Dates: {
+    OrderDate: newOrder.OrderDate,
+    RequiredDate: newOrder.RequiredDate
+  },
+  OrderDetails: orderDetailsInfo,
+  Freight: newOrder.Freight,
+  OrderTotal: orderTotal,
+  Shipment: {
+    Shipper: {
+      ShipperID: shipper.ShipperID,
+      CompanyName: shipper.CompanyName
+    },
+    ShipName: newOrder.ShipName,
+    ShipAddress: newOrder.ShipAddress,
+    ShipCity: newOrder.ShipCity,
+    ShipCountry: newOrder.ShipCountry
+  }
+});
+```
+
+### Aktualizacja kolekcji `CustomerInfo`
+
+```javascript
+const newOrderInfo = db.OrdersInfo.findOne({OrderID: newOrderID});
+const orderForCustomer = {
+  OrderID: newOrderInfo.OrderID,
+  Employee: newOrderInfo.Employee,
+  Dates: newOrderInfo.Dates,
+  OrderDetails: newOrderInfo.OrderDetails,
+  Freight: newOrderInfo.Freight,
+  OrderTotal: newOrderInfo.OrderTotal,
+  Shipment: newOrderInfo.Shipment
+};
+
+db.CustomerInfo.updateOne(
+  { CustomerID: "ALFKI" },
+  { $push: { Orders: orderForCustomer } }
+);
+```
+
+---
+
 # f)
+
+### Aktualizacja `orderdetails`
+
+```javascript
+const currentDetails = db.orderdetails.find({OrderID: newOrderID}).toArray();
+
+currentDetails.forEach(function(detail) {
+  const newDiscount = detail.Discount + 0.05;
+  db.orderdetails.updateOne(
+    { OrderID: newOrderID, ProductID: detail.ProductID },
+    { $set: { Discount: newDiscount } }
+  );
+});
+```
+
+### Aktualizacja `OrdersInfo`
+
+```javascript
+const orderInfo = db.OrdersInfo.findOne({OrderID: newOrderID});
+let newOrderTotal = 0;
+
+const updatedOrderDetails = orderInfo.OrderDetails.map(detail => {
+  const newDiscount = detail.Discount + 0.05;
+  const newValue = detail.UnitPrice * detail.Quantity * (1 - newDiscount);
+  newOrderTotal += newValue;
+
+  return {
+    ...detail,
+    Discount: newDiscount,
+    Value: newValue
+  };
+});
+
+db.OrdersInfo.updateOne(
+  { OrderID: newOrderID },
+  { 
+    $set: { 
+      OrderDetails: updatedOrderDetails,
+      OrderTotal: newOrderTotal
+    } 
+  }
+);
+```
+
+### Aktualizacja `CustomerInfo`
+
+```javascript
+const updatedOrderInfo = db.OrdersInfo.findOne({OrderID: newOrderID});
+
+db.CustomerInfo.updateOne(
+  { CustomerID: "ALFKI", "Orders.OrderID": newOrderID },
+  { 
+    $set: { 
+      "Orders.$.OrderDetails": updatedOrderInfo.OrderDetails,
+      "Orders.$.OrderTotal": updatedOrderInfo.OrderTotal
+    } 
+  }
+);
+```
+
 
 Napisz polecenie które modyfikuje zamówienie dodane w pkt e)  zwiększając zniżkę  o 5% (dla każdej pozycji tego zamówienia) 
 
