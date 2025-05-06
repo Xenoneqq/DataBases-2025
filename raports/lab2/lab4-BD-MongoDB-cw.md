@@ -265,109 +265,221 @@ Napisz polecenie/zapytanie: Dla każdego klienta pokaż wartość zakupionych pr
 ```
 
 ## Rozwiązanie
+### Używając oryginalnych kolekcji
+```mongodb
+db.customers.aggregate([
+  // Dla każdego klienta łączymy zamówienia z 1997
+  {
+    $lookup: {
+      from: "orders",
+      let: { cid: "$CustomerID" },
+      pipeline: [
+        // filtrujemy po kliencie i dacie
+        { $match: {
+            $expr: {
+              $and: [
+                { $eq: ["$CustomerID", "$$cid"] },
+                { $gte: ["$OrderDate", ISODate("1997-01-01T00:00:00Z")] },
+                { $lt:  ["$OrderDate", ISODate("1998-01-01T00:00:00Z")] }
+              ]
+            }
+        }},
+        // dołączamy szczegóły pozycji
+        { $lookup: {
+            from: "orderdetails",
+            localField: "OrderID",
+            foreignField: "OrderID",
+            as: "details"
+        }},
+        { $unwind: { path: "$details", preserveNullAndEmptyArrays: true }},
 
+        // dołączamy dane produktu
+        { $lookup: {
+            from: "products",
+            localField: "details.ProductID",
+            foreignField: "ProductID",
+            as: "product"
+        }},
+        { $unwind: { path: "$product", preserveNullAndEmptyArrays: true }},
+
+        // dołączamy kategorię tylko jeśli to Confections
+        { $lookup: {
+            from: "categories",
+            let: { catId: "$product.CategoryID" },
+            pipeline: [
+              { $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$CategoryID", "$$catId"] },
+                      { $eq: ["$CategoryName", "Confections"] }
+                    ]
+                  }
+              }}
+            ],
+            as: "cat"
+        }},
+        { $unwind: { path: "$cat", preserveNullAndEmptyArrays: true }},
+
+        // obliczamy wartość pozycji (0 jeśli nie Confections)
+        { $project: {
+            lineValue: {
+              $cond: [
+                { $gt: ["$cat", null] },
+                { $multiply: ["$details.Quantity", "$details.UnitPrice", { $subtract: [1, "$details.Discount"] }] },
+                0
+              ]
+            }
+        }}
+      ],
+      as: "lines"
+    }
+  },
+
+  // Sumujemy wszystkie wartości linii
+  {
+    $addFields: {
+      totalConfections1997: { $sum: "$lines.lineValue" }
+    }
+  },
+
+  // Końcowy projection i sortowanie
+  {
+    $project: {
+      _id: 0,
+      customerID: "$CustomerID",
+      customerName: "$CompanyName",
+      totalConfections1997: 1
+    }
+  },
+  { $sort: { customerID: 1 } }
+]);
+
+
+```
 ### Używając OrdersInfo
 
 ```mongodb
-(function() {
-    const Customers = {};
+db.OrdersInfo.aggregate([
+  // Rozwiń każdą pozycję zamówienia
+  { $unwind: "$OrderDetails" },
 
-    db.OrdersInfo.find().forEach(function(order) {
-        let Confections1997 = 0;
+  // Dodaj pole lineValue
+  {
+    $addFields: {
+      lineValue: {
+        $cond: [
+          {
+            $and: [
+              // data zamówienia w roku 1997
+              { $gte: ["$Dates.OrderDate", ISODate("1997-01-01T00:00:00Z")] },
+              { $lt:  ["$Dates.OrderDate", ISODate("1998-01-01T00:00:00Z")] },
+              // produkt z kategorii Confections
+              { $eq: ["$OrderDetails.product.CategoryName", "Confections"] }
+            ]
+          },
+          // obliczamy Quantity * UnitPrice * (1 - Discount)
+          {
+            $multiply: [
+              "$OrderDetails.Quantity",
+              "$OrderDetails.UnitPrice",
+              { $subtract: [1, "$OrderDetails.Discount"] }
+            ]
+          },
+          // w przeciwnym razie
+          0
+        ]
+      }
+    }
+  },
 
-        let isFrom1997 = false;
-        const orderDate = order.Dates.OrderDate;
+  // Grupuj po kliencie i sumuj lineValue
+  {
+    $group: {
+      _id: {
+        customerID:   "$Customer.CustomerID",
+        customerName: "$Customer.CompanyName"
+      },
+      totalConfections1997: { $sum: "$lineValue" }
+    }
+  },
 
-        // STRING - check for 1997
-        if (typeof orderDate === 'string') {
-            isFrom1997 = orderDate.includes('1997');
-        }
+  // Formatujemy wynik
+  {
+    $project: {
+      _id: 0,
+      customerID:   "$_id.customerID",
+      customerName: "$_id.customerName",
+      totalConfections1997: 1
+    }
+  },
 
-        // OBJECT - turn into string then check for 1997
-        else if (orderDate && typeof orderDate === 'object') {
-            const dateStr = orderDate.toString();
-            isFrom1997 = dateStr.includes('1997');
-        }
+  // Sortowanie
+  { $sort: { customerID: 1 } }
+]);
 
-        if (isFrom1997 === true) {
-            orderDetails = order.OrderDetails;
-            for(let i = 0; i < orderDetails.length; i++){
-                if(orderDetails[i].product.CategoryName == "Confections"){
-                    Confections1997 += orderDetails[i].Value;
-                }
-            }
 
-            Confections1997 = parseFloat(Math.round(Confections1997 * 100) / 100);
-
-            if(Customers[order.Customer.CustomerID] === undefined) {
-                Customers[order.Customer.CustomerID] = {
-                    _id : order.Customer.CustomerID,
-                    CustomerName : order.Customer.CompanyName,
-                    Confections1997 : Confections1997,
-                }
-            }
-            else{
-                Customers[order.Customer.CustomerID].Confections1997 += Confections1997 || 0;
-            }
-        }
-    })
-
-    return Object.values(Customers).sort((a,b) => a._id.localeCompare(b._id));
-})();
 ```
 
 ### Używając CustomerInfo
 
 ```mongodb
-(function() {
+db.CustomerInfo.aggregate([
+  // Rozbijamy zamówienia na pojedyncze dokumenty
+  { $unwind: {
+      path: "$Orders",
+      preserveNullAndEmptyArrays: true
+  }},
 
-    const results = []
+  // Rozbijamy szczegóły zamówienia
+  { $unwind: {
+      path: "$Orders.OrderDetails",
+      preserveNullAndEmptyArrays: true
+  }},
 
-    db.CustomerInfo.find().forEach(function(customer){
-        let ConfectionSale97 = 0;
-        const orders = customer.Orders;
+  // 3. Dodajemy pole lineValue (tylko Confections z 1997)
+  { $addFields: {
+      lineValue: {
+        $cond: [
+          {
+            $and: [
+              // zamówienie w 1997
+              { $gte: ["$Orders.Dates.OrderDate", ISODate("1997-01-01T00:00:00Z")] },
+              { $lt:  ["$Orders.Dates.OrderDate", ISODate("1998-01-01T00:00:00Z")] },
+              // produkt w kategorii Confections
+              { $eq: ["$Orders.OrderDetails.product.CategoryName", "Confections"] }
+            ]
+          },
+          // jeśli warunki spełnione → Quantity * UnitPrice * (1-Discount)
+          { $multiply: ["$Orders.OrderDetails.Quantity", "$Orders.OrderDetails.UnitPrice", { $subtract: [1, "$Orders.OrderDetails.Discount"] }] },
+          // w przeciwnym razie 0
+          0
+        ]
+      }
+  }},
 
-        for (let i = 0; i < orders.length; i++) {
-            let isFrom1997 = false;
-            const orderDate = orders[i].Dates.OrderDate;
+  // Grupujemy po kliencie i sumujemy wszystkie lineValue
+  { $group: {
+      _id: {
+        customerID:   "$CustomerID",
+        customerName: "$CompanyName"
+      },
+      totalConfections1997: { $sum: "$lineValue" }
+  }},
 
-            // STRING - check for 1997
-            if (typeof orderDate === 'string') {
-                isFrom1997 = orderDate.includes('1997');
-            }
+  // Formatujemy wynik
+  { $project: {
+      _id: 0,
+      customerID:   "$_id.customerID",
+      customerName: "$_id.customerName",
+      totalConfections1997: 1
+  }},
 
-            // OBJECT - turn into string then check for 1997
-            else if (orderDate && typeof orderDate === 'object') {
-                const dateStr = orderDate.toString();
-                isFrom1997 = dateStr.includes('1997');
-            }
+  // Sortujemy po ID klienta
+  { $sort: { customerID: 1 } }
+]);
 
-            if (isFrom1997) {
-                const orderDetails = orders[i].OrderDetails;
-
-                if (!orderDetails) continue;
-
-                for(let j = 0; j < orderDetails.length; j++){
-                    if(orderDetails[j].product &&
-                       orderDetails[j].product.CategoryName === "Confections") {
-                        ConfectionSale97 += orderDetails[j].Value || 0;
-                    }
-                }
-            }
-        }
-
-        results.push(
-        {
-            _id: customer.CustomerID,
-            CompanyName: customer.CompanyName,
-            ConfectionSale97: ConfectionSale97.toFixed(2)
-        })
-    });
-
-    return results.sort((a,b) => a._id.localeCompare(b._id))
-})();
 ```
-
+*Uwaga: ilość wyników metodą z OrdersInfo różni sie od innych, ponieważ dwóch klientów nie składało żadnego zamówienia, więc nie ma ich w OrdersInfo.*
 # d)
 
 Napisz polecenie/zapytanie:  Dla każdego klienta poaje wartość sprzedaży z podziałem na lata i miesiące
