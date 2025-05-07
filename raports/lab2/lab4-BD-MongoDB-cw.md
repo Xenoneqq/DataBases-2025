@@ -903,6 +903,16 @@ db.CustomerInfo.updateOne(
 
 # f)
 
+Napisz polecenie które modyfikuje zamówienie dodane w pkt e)  zwiększając zniżkę  o 5% (dla każdej pozycji tego zamówienia) 
+
+Napisz polecenie 
+- aktualizując oryginalną kolekcję `orderdetails`
+- aktualizując kolekcję `OrderInfo`
+- aktualizując kolekcję `CustomerInfo`
+
+UWAGA:
+W raporcie należy zamieścić kod poleceń oraz uzyskany rezultat, np wynik  polecenia `db.kolekcka.fimd().limit(2)` lub jego fragment
+
 ### Aktualizacja `orderdetails`
 
 ```javascript
@@ -963,19 +973,6 @@ db.CustomerInfo.updateOne(
 ```
 
 
-Napisz polecenie które modyfikuje zamówienie dodane w pkt e)  zwiększając zniżkę  o 5% (dla każdej pozycji tego zamówienia) 
-
-Napisz polecenie 
-- aktualizując oryginalną kolekcję `orderdetails`
-- aktualizując kolekcję `OrderInfo`
-- aktualizując kolekcję `CustomerInfo`
-
-
-
-UWAGA:
-W raporcie należy zamieścić kod poleceń oraz uzyskany rezultat, np wynik  polecenia `db.kolekcka.fimd().limit(2)` lub jego fragment
-
-
 # Zadanie 2 - modelowanie danych
 
 
@@ -1016,8 +1013,169 @@ Do sprawozdania należy kompletny zrzut wykonanych/przygotowanych baz danych (ta
 ## Zadanie 2  - rozwiązanie
 
 ---
-## Tworzenie DBs: (to będzie do wywalenia)
-#### Wariant 1
+
+### Ładowanie danych z dumpa
+
+1. **Ładowanie Bazy Danych : Wariant 1**
+
+  Aby załadować dane do bazy danych `auctionDB1`, wykonaj poniższą komendę:
+
+   ```bash
+   cd ./data
+   mongorestore ./auctionDB1
+   ```
+
+2. **Ładowanie Bazy Danych : Wariant 2**
+
+  Aby załadować dane do bazy danych `auctionDB2`, wykonaj poniższą komendę:
+
+   ```bash
+   cd ./data
+   mongorestore ./auctionDB2
+   ```
+
+Czasami ta komenda może nie zadziałąć wtedy zaleca się użycie odwołania do zapytania http
+
+---
+
+## Wariant 1: Znormalizowany (referencje)
+
+### Struktura:
+- **users** – Przechowuje informacje o użytkownikach.
+  - nazwa
+  - e-mail
+  - hasło (hash)
+  - lista refresh tokenów
+
+- **auction** – Przechowuje dane o aktywnych aukcjach.
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu (lista URL)
+  - data początku
+  - data zakończenia
+  - status akcji (np. active / closed)
+
+- **auction.bids** – Przechowuje wszystkie oferty (bids) na aukcje jako osobna kolekcja.
+  - id aukcji (referencja do `auction`)
+  - user id (referencja do `users`)
+  - wystawiona cena
+  - data wystawienia (milisekundy / ISODate)
+
+- **auction.history** – Przechowuje informacje o zakończonych aukcjach.
+  - id aukcji (referencja)
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - wygrana przez user id (referencja)
+  - lista bidów (referencje do `auction.bids`)
+  - status akcji
+
+- **log** – Przechowuje informacje o operacjach wykonanych w ramach bazy.
+  - typ encji (np. user / auction / bid)
+  - id encji
+  - akcja (np. create / update / delete)
+  - data wykonania
+  - dodatkowe dane operacji (meta)
+
+### Zalety:
+- Lepsza skalowalność – dane można łatwo rozproszyć między kolekcje.
+- Redukcja duplikacji danych (np. opis aukcji nie jest powielany w historii).
+- Ułatwia kontrolę spójności przy użyciu walidacji i relacji.
+
+### Wady:
+- Więcej zapytań i joinów (przez `$lookup`) – większe obciążenie przy agregacjach.
+- Trudniejsze do wdrożenia w systemach z wysoką liczbą zapytań.
+- Czasochłonniejsze dla prostych operacji.
+
+### Przykładowe operacje:
+
+#### 1. Znajdź wszystkie aktywne aukcje
+To zapytanie zwraca wszystkie aukcje o statusie "active"
+
+```mongodb
+db.auction.find({ status: "active" });
+```
+
+#### 2. Znajdź wszystkie zakończone aukcje (zamknięte)
+To zapytanie zwraca wszystkie aukcje o statusie "closed"
+```mongodb
+db.auction.find({ status: "closed" });
+```
+
+#### 3. Znajdź wszystkie aukcje w kategorii "Electronics"
+To zapytanie filtruje aukcje według kategorii
+```mongodb
+db.auction.find({ category: "Electronics" });
+```
+
+#### 4. Znajdź konkretną aukcję po tytule
+To zapytanie wyszukuje aukcję z podanym dokładnym tytułem
+
+```mongodb
+db.auction.findOne({ title: "Vintage Watch Collection 42" });
+```
+
+#### 5. Znajdź aukcje zawierające słowo w tytule (wyszukiwanie częściowe)
+To zapytanie używa wyrażenia regularnego do wyszukiwania tytułów zawierających słowo "Camera"
+
+```mongodb
+db.auction.find({ title: /Camera/ });
+```
+
+#### 6. Znajdź aukcje rozpoczynające się w konkretnym przedziale dat
+To zapytanie wyszukuje aukcje rozpoczynające się pomiędzy 1 stycznia a 31 marca 2025
+
+```mongodb
+db.auction.find({
+  startDate: {
+    $gte: new Date("2025-01-01T00:00:00Z"),
+    $lte: new Date("2025-03-31T23:59:59Z")
+  }
+});
+```
+
+#### 7. Znajdź aukcję wraz ze wszystkimi jej ofertami
+To zapytanie wykonuje złączenie między kolekcją auction i auction.bids, aby pobrać aukcję razem z jej ofertami
+
+```mongodb
+db.auction.aggregate([
+  { $match: { title: "Vintage Watch Collection 42" } },
+  {
+    $lookup: {
+      from: "auction.bids",
+      localField: "_id",
+      foreignField: "auctionId",
+      as: "bids"
+    }
+  }
+]);
+```
+
+#### 8. Znajdź oferty użytkownika wraz z danymi aukcji
+To zapytanie wyszukuje oferty konkretnego użytkownika i łączy je z danymi aukcji
+
+```mongodb
+db.auction.bids.aggregate([
+  { $match: { userId: db.users.findOne({ username: "jankowalski123" })._id } },
+  {
+    $lookup: {
+      from: "auction",
+      localField: "auctionId",
+      foreignField: "_id",
+      as: "auctionDetails"
+    }
+  },
+  { $unwind: "$auctionDetails" }
+]);
+```
+
+### Struktura bazy : Wariant 1
+
 ```mongoDB
 // 1. Przełączamy się na bazę
 use auctionDB1;
@@ -1027,7 +1185,7 @@ db.createCollection("users", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["username","email","passwordHash"],
+      required: ["userid","username","email","passwordHash"],
       properties: {
         username:   { bsonType: "string", description: "nazwa użytkownika, obowiązkowe" },
         email:      { bsonType: "string", pattern:   "^.+@.+\\..+$", description: "poprawny e-mail" },
@@ -1053,7 +1211,7 @@ db.createCollection("auction", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["title","startDate","endDate","status"],
+      required: ["auctionid","title","startDate","endDate","status"],
       properties: {
         title:       { bsonType: "string" },
         category:    { bsonType: "string" },
@@ -1123,7 +1281,105 @@ db.createCollection("log", {
   }
 });
 ```
-#### Wariant 2
+
+---
+
+## Wariant 2: Zagnieżdżone dokumenty (denormalizacja)
+
+- **users**
+  - nazwa
+  - e-mail
+  - hasło (hash)
+  - lista refresh tokenów
+
+- **auction** – Przechowuje dane o aukcji **wraz z ofertami**.
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - status akcji
+  - bids (tablica zagnieżdżonych dokumentów)
+    - user id
+    - wystawiona cena
+    - data wystawienia
+
+- **auction.history** – Zakończone aukcje wraz z pełną historią bidów.
+  - id aukcji
+  - nazwa
+  - kategoria
+  - opis przedmiotu
+  - media przedmiotu
+  - data początku
+  - data zakończenia
+  - wygrana przez user id
+  - lista bidów (wbudowana tablica obiektów)
+    - user id
+    - wystawiona cena
+    - data wystawienia
+  - status akcji
+
+- **log**
+  - typ operacji
+  - czas
+  - meta
+  - nazwa kolekcji / dokumentu
+
+
+### Zalety:
+- Bardzo szybki dostęp do pełnych danych aukcji w jednym zapytaniu.
+- Mniejsza liczba joinów i operacji agregujących oznacza lepszą wydajność w prostych przypadkach.
+- Dobra współpraca tego rozwiązania z MongoDB (pojedyńczy plik JSON zamiast kilku kolekcji).
+
+### Wady:
+- Duplikacja danych może powodować trudniejsze aktualizacje danych.
+- Dokumenty mogą szybko osiągnąć limit 16MB.
+
+### Przykładowe operacje:
+
+#### 1. Znajdź wszystkie aukcje o statusie "active"
+To zapytanie zwraca wszystkie aukcje, które są w stanie "active" (aktywnych).
+
+```mongodb
+db.auction.find({ status: "active" });
+```
+
+#### 2. Znajdź wszystkie aukcje w kategorii "Electronics"
+To zapytanie filtruje aukcje, aby znaleźć te, które należą do kategorii "Electronics".
+
+```mongodb
+db.auction.find({ category: "Elektronika" });
+```
+
+#### 3. Znajdź konkretną aukcję po tytule
+To zapytanie wyszukuje aukcję z dokładnym tytułem "Vintage Watch Collection 42".
+
+```mongodb
+db.auction.findOne({ title: "Aukcja 5: Przedmiot #105" });
+```
+
+#### 4. Znajdź aukcje zawierające słowo w tytule (wyszukiwanie częściowe)
+To zapytanie używa wyrażenia regularnego, aby znaleźć aukcje, których tytuł zawiera słowo "Camera".
+
+```mongodb
+db.auction.find({ title: /105/ });
+```
+
+#### 5. Znajdź aukcje rozpoczynające się w określonym przedziale dat
+To zapytanie zwraca aukcje, które zaczynają się między 1 stycznia a 31 marca 2025 roku.
+
+```mongodb
+db.auction.find({
+  startDate: {
+    $gte: new Date("2025-08-01T00:00:00Z"),
+    $lte: new Date("2025-09-31T23:59:59Z")
+  }
+});
+```
+
+### Struktura bazy : Wariant 2
 ```mongoDB
 // 1. Przełączamy się na bazę
 use auctionDB2;
@@ -1221,315 +1477,7 @@ db.createCollection("log", {
   }
 });
 ```
-#### Wariant 3:
-```mongoDB
-// 1. Przełączamy się na bazę
-use auctionDB3;
 
-// 2. Kolekcja users
-db.createCollection("users", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["username","email","passwordHash"],
-      properties: {
-        username:    { bsonType: "string" },
-        email:       { bsonType: "string", pattern: "^.+@.+\\..+$" },
-        passwordHash:{ bsonType: "string" }
-      }
-    }
-  }
-});
-
-// 3. Kolekcja auction (meta + bidsPreview)
-db.createCollection("auction", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["title","startDate","endDate","status","bidsPreview"],
-      properties: {
-        title:       { bsonType: "string" },
-        category:    { bsonType: "string" },
-        description: { bsonType: "string" },
-        media: {
-          bsonType: "array",
-          items: { bsonType: "string" }
-        },
-        startDate:   { bsonType: "date" },
-        endDate:     { bsonType: "date" },
-        status:      { enum: ["active","closed","scheduled"] },
-        bidsPreview: {
-          bsonType: "array",
-          items: {
-            bsonType: "object",
-            required: ["userId","amount","placedAt"],
-            properties: {
-              userId:   { bsonType: "objectId" },
-              amount:   { bsonType: "double" },
-              placedAt: { bsonType: "date" }
-            }
-          }
-        }
-      }
-    }
-  }
-});
-
-// 4. Kolekcja auction.bids (pełna historia)
-db.createCollection("auction.bids", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["auctionId","userId","amount","placedAt"],
-      properties: {
-        auctionId: { bsonType: "objectId" },
-        userId:    { bsonType: "objectId" },
-        amount:    { bsonType: "double", minimum: 0 },
-        placedAt:  { bsonType: "date" }
-      }
-    }
-  }
-});
-
-// 5. Kolekcja auction.history
-db.createCollection("auction.history", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["auctionId","winnerUserId","bids","closedAt"],
-      properties: {
-        auctionId:    { bsonType: "objectId" },
-        winnerUserId: { bsonType: "objectId" },
-        finalPrice:   { bsonType: "double" },
-        bids: {
-          bsonType: "array",
-          items: { bsonType: "objectId" }
-        },
-        closedAt:     { bsonType: "date" }
-      }
-    }
-  }
-});
-
-// 6. Kolekcja log
-db.createCollection("log", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["entity","action","timestamp"],
-      properties: {
-        entity:    { enum: ["user","auction","bid"] },
-        action:    { bsonType: "string" },
-        timestamp: { bsonType: "date" },
-        meta:      { bsonType: "object" }
-      }
-    }
-  }
-});
-
-```
----
-
-### Ładowanie danych z dumpa
-
-Aby załadować dane z dumpa bazy `AuctionDatabase`, użyj jednej z poniższych komend:
-
-1. **Podstawowe ładowanie:**
-   ```bash
-   mongorestore ./AuctionDatabase
-   ```
-   - Ładuje dane z lokalnego dumpa do domyślnej instancji MongoDB.
-
-2. **Ładowanie z pełnym connection stringiem:**
-   ```bash
-   mongorestore --uri="mongodb://localhost:27017" --db=AuctionDatabase ./AuctionDatabase
-   ```
-   - Określa połączenie i bazę danych, do której mają trafić dane.
-
-3. **Nadpisanie istniejącej bazy danych:**
-   ```bash
-   mongorestore --uri="mongodb://localhost:27017" --drop --db=AuctionDatabase ./AuctionDatabase
-   ```
-   - Usuwa istniejące dane przed załadowaniem nowych.
-
----
-
-## Wariant 1: Znormalizowany (referencje)
-
-### Struktura:
-- **users** – Przechowuje informacje o użytkownikach.
-  - nazwa
-  - e-mail
-  - hasło (hash)
-  - lista refresh tokenów
-
-- **auction** – Przechowuje dane o aktywnych aukcjach.
-  - id aukcji
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu (lista URL)
-  - data początku
-  - data zakończenia
-  - status akcji (np. active / closed)
-
-- **auction.bids** – Przechowuje wszystkie oferty (bids) na aukcje jako osobna kolekcja.
-  - id aukcji (referencja do `auction`)
-  - user id (referencja do `users`)
-  - wystawiona cena
-  - data wystawienia (milisekundy / ISODate)
-
-- **auction.history** – Przechowuje informacje o zakończonych aukcjach.
-  - id aukcji (referencja)
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu
-  - data początku
-  - data zakończenia
-  - wygrana przez user id (referencja)
-  - lista bidów (referencje do `auction.bids`)
-  - status akcji
-
-- **log** – Przechowuje informacje o operacjach wykonanych w ramach bazy.
-  - typ encji (np. user / auction / bid)
-  - id encji
-  - akcja (np. create / update / delete)
-  - data wykonania
-  - dodatkowe dane operacji (meta)
-
-### Zalety:
-- Lepsza skalowalność – dane można łatwo rozproszyć między kolekcje.
-- Redukcja duplikacji danych (np. opis aukcji nie jest powielany w historii).
-- Ułatwia kontrolę spójności przy użyciu walidacji i relacji.
-
-### Wady:
-- Więcej zapytań i joinów (przez `$lookup`) – większe obciążenie przy agregacjach.
-- Trudniejsze do wdrożenia w systemach z wysoką liczbą zapytań.
-- Czasochłonniejsze dla prostych operacji.
-
-### Przykładowe operacje:
-TODO
----
-
-## Wariant 2: Zagnieżdżone dokumenty (denormalizacja)
-
-- **users**
-  - nazwa
-  - e-mail
-  - hasło (hash)
-  - lista refresh tokenów
-
-- **auction** – Przechowuje dane o aukcji **wraz z ofertami**.
-  - id aukcji
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu
-  - data początku
-  - data zakończenia
-  - status akcji
-  - bids (tablica zagnieżdżonych dokumentów)
-    - user id
-    - wystawiona cena
-    - data wystawienia
-
-- **auction.history** – Zakończone aukcje wraz z pełną historią bidów.
-  - id aukcji
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu
-  - data początku
-  - data zakończenia
-  - wygrana przez user id
-  - lista bidów (wbudowana tablica obiektów)
-    - user id
-    - wystawiona cena
-    - data wystawienia
-  - status akcji
-
-- **log**
-  - typ operacji
-  - czas
-  - meta
-  - nazwa kolekcji / dokumentu
-
-
-### Zalety:
-- Bardzo szybki dostęp do pełnych danych aukcji w jednym zapytaniu.
-- Mniejsza liczba joinów i operacji agregujących oznacza lepszą wydajność w prostych przypadkach.
-- Dobra współpraca tego rozwiązania z MongoDB (pojedyńczy plik JSON zamiast kilku kolekcji).
-
-### Wady:
-- Duplikacja danych może powodować trudniejsze aktualizacje danych.
-- Dokumenty mogą szybko osiągnąć limit 16MB.
-
-### Przykładowe operacje:
-TODO
-
----
-
-## Wariant 3: połączenie powyższych (embedowanie + referencje)
-
-- **users**
-  - nazwa
-  - e-mail
-  - hasło (hash)
-  - lista refresh tokenów
-
-- **auction**
-  - id aukcji
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu
-  - data początku
-  - data zakończenia
-  - status akcji
-  - bidsPreview (ostatnie 5–10 ofert)
-    - user id
-    - wystawiona cena
-    - data wystawienia
-
-- **auction.bids** – Wszystkie oferty jako osobna kolekcja (pełna historia).
-  - id aukcji
-  - user id
-  - wystawiona cena
-  - data wystawienia
-
-- **auction.history**
-  - id aukcji
-  - nazwa
-  - kategoria
-  - opis przedmiotu
-  - media przedmiotu
-  - data początku
-  - data zakończenia
-  - wygrana przez user id
-  - lista bidów (referencje do dokumentów w `auction.bids`)
-  - status akcji
-
-- **log**
-  - typ operacji
-  - czas
-  - obiekt (np. aukcja, bid)
-  - identyfikator obiektu
-  - dane dodatkowe
-
-
-### Zalety:
-- Łączy zalety obu podejść – szybki dostęp do najważniejszych danych + pełna historia w osobnej kolekcji.
-- Optymalizacja pod kątem wydajności (przeglądanie aukcji) i elastyczności (analiza historii).
-- Umożliwia budowanie funkcji typu "ostatnie oferty" bez konieczności pełnego przeszukiwania bazy.
-
-### Wady:
-- Większa złożoność implementacyjna (dane częściowo zagnieżdżone, częściowo referencyjne).
-- Wymaga dbałości o spójność między kolekcjami (np. bidsPreview vs auction.bids).
-- Trudniejsze w debugowaniu i utrzymaniu.
-
-### Przykładowe operacje:
-TODO
 
 ---
 
