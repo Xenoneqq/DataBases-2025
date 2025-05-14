@@ -3,13 +3,13 @@
 using System;
 using System.Linq;
 
-ProdContext prodContext = new ProdContext();
+DatabaseContext dbContext = new DatabaseContext();
 Console.WriteLine("Podaj nazwę produktu: ");
 String? prodName = Console.ReadLine();
 Product product = new Product { ProductName = prodName};
-prodContext.Products.Add(product);
-prodContext.SaveChanges();
-var query = from prod in prodContext.Products
+dbContext.Products.Add(product);
+dbContext.SaveChanges();
+var query = from prod in dbContext.Products
 select prod.ProductName;
 
 foreach (var pName in query)
@@ -25,3 +25,10 @@ public class Product {
     public int UnitsInStock {get; set;}
 }
 
+
+public class Supplier {
+    public int SupplierID {get; set;}
+    public String? CompanyName {get; set;}
+    public String? Street {get; set;} 
+    public String? City {get; set;}
+}
