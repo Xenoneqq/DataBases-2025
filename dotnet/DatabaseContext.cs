@@ -10,4 +10,12 @@ public class DatabaseContext : DbContext
         base.OnConfiguring(optionsBuilder);
         optionsBuilder.UseSqlite("Datasource=MyProductDatabase");
     }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Product>()
+            .HasOne(p => p.Supplier)
+            .WithMany(s => s.Products)
+            .HasForeignKey(p => p.SupplierID);
+    }
 }
