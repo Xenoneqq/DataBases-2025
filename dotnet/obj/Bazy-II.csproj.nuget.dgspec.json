@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II\\Bazy-II.csproj": {}
+    "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II.csproj": {}
   },
   "projects": {
-    "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II\\Bazy-II.csproj": {
+    "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II\\Bazy-II.csproj",
+        "projectUniqueName": "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II.csproj",
         "projectName": "Bazy-II",
-        "projectPath": "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II\\Bazy-II.csproj",
+        "projectPath": "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II.csproj",
         "packagesPath": "C:\\Users\\barte\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\Bazy-II\\obj\\",
+        "outputPath": "C:\\Users\\barte\\OneDrive\\Dokumenty\\GitHub\\DataBases-2025\\dotnet\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\barte\\AppData\\Roaming\\NuGet\\NuGet.Config"

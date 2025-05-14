@@ -12,6 +12,3 @@ public class Product {
     public int UnitsInStock {get; set;}
 }
 
-
-
-
