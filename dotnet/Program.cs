@@ -1,46 +1,42 @@
-﻿// See https://aka.ms/new-console-template for more information
+﻿using Microsoft.EntityFrameworkCore;
 
-using System;
-using System.Dynamic;
-using System.Linq;
+using DatabaseContext dbContext = new DatabaseContext();
 
-DatabaseContext dbContext = new DatabaseContext();
-Console.WriteLine("Podaj nazwę produktu: ");
-String? prodName = Console.ReadLine();
-Product product = new Product { ProductName = prodName};
-dbContext.Products.Add(product);
+dbContext.Suppliers.Add(
+    new Supplier()
+    {
+        CompanyName = "ACME Corp"
+    }
+);
+
+var product = dbContext.Products
+                           .Include(p => p.Supplier)
+                           .SingleOrDefault(p => p.ProductName == "Kaczka");
+
+var supplier = dbContext.Suppliers.SingleOrDefault(s => s.CompanyName == "ACME Corp");
+
+if (product != null)
+    product.Supplier = supplier;
+
 dbContext.SaveChanges();
-var query = from prod in dbContext.Products
-select prod.ProductName;
 
-foreach (var pName in query)
+var query = dbContext.Products
+                     .Include(p => p.Supplier)
+                     .Select(p => new 
+                     {
+                         ProductName = p.ProductName,
+                         SupplierName = p.Supplier.CompanyName
+                     });
+
+foreach (var item in query)
 {
-    Console.WriteLine(pName);
+    Console.WriteLine($"{item.ProductName}, Dostawca: {item.SupplierName}");
 }
 
-query = from sup in dbContext.Suppliers
+var query2 = from sup in dbContext.Suppliers
 select sup.CompanyName;
-
-foreach (var sup in query)
+Console.WriteLine("\nCompanies:");
+foreach (var sup in query2)
 {
     Console.WriteLine(sup);
-}
-
-public class Product {
-    public int ProductID {get; set;}
-    public String? ProductName {get; set;} 
-    public int UnitsInStock {get; set;}
-
-    public int SupplierID {get; set;}
-    public Supplier Supplier {get; set;}
-}
-
-
-public class Supplier {
-    public int SupplierID {get; set;}
-    public String? CompanyName {get; set;}
-    public String? Street {get; set;} 
-    public String? City {get; set;}
-
-    public ICollection<Product> Products {get; set;}
 }

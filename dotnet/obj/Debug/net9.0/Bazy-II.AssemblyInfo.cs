@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Bazy-II")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+358bd8ded7845d1f62fc87dc9b5910af99755b83")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e16dd0eaa67cd3d85d858e72c3dd127511da933c")]
 [assembly: System.Reflection.AssemblyProductAttribute("Bazy-II")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Bazy-II")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
