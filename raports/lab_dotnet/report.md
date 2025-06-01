@@ -63,6 +63,8 @@ e) Dodanie nowych tabel:
 ![alt text](./IIe/tables.png)
 Dodanie relacji między nimi
 ![alt text](./IIe/relations.png)
+Schemat:
+![alt text](./IIe/scheme.png)
 Kod dodający klienów:
 ![alt text](./IIe/adding-clients.png)
 Kod wyświetlających klientów:
@@ -77,6 +79,8 @@ Użyte tabele (bez zmian)
 ![alt text](./IIf/tables.png)
 Nowa modyfikacja relacji:
 ![alt text](./IIf/relations.png)
+Schemat:
+![alt text](./IIf/scheme.png)
 Kod dodający klienów:
 ![alt text](./IIf/adding-clients.png)
 Kod wyświetlających klientów:
