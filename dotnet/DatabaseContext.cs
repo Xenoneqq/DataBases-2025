@@ -66,16 +66,25 @@ public class DatabaseContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Mapowanie tabeli głównej dla Company
         modelBuilder.Entity<Company>()
-            .HasDiscriminator<string>("CompanyType")
-            .HasValue<Supplier>("Supplier")
-            .HasValue<Customer>("Customer");
+            .ToTable("Companies"); // wspólne CompanyID, CompanyName, Street, City, ZipCode
 
+        // Mapowanie tabeli dla Supplier
+        modelBuilder.Entity<Supplier>()
+            .ToTable("Suppliers"); // tutaj EF Core utworzy CompanyID i BankAccountNumber
+
+        // Mapowanie tabeli dla Customer
+        modelBuilder.Entity<Customer>()
+            .ToTable("Customers");  // a tutaj EF Core doda CompanyID i Discount
+
+        // Relacja Supplier - Product
         modelBuilder.Entity<Supplier>()
             .HasMany(s => s.Products)
             .WithOne(p => p.Supplier)
             .HasForeignKey(p => p.SupplierID);
 
+        // Relacja InvoiceProduct jako łącznik wiele‐do‐wielu
         modelBuilder.Entity<InvoiceProduct>()
             .HasKey(ip => new { ip.InvoiceID, ip.ProductID });
 
