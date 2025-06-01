@@ -9,8 +9,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Bazy_II.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20250531184523_addNullableProducts")]
-    partial class addNullableProducts
+    [Migration("20250531222024_bidirectionalRelation")]
+    partial class bidirectionalRelation
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,9 +25,10 @@ namespace Bazy_II.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ProductName")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("SupplierID")
+                    b.Property<int>("SupplierID")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("UnitsOnStock")
@@ -50,6 +51,7 @@ namespace Bazy_II.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CompanyName")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Street")
@@ -64,7 +66,9 @@ namespace Bazy_II.Migrations
                 {
                     b.HasOne("Supplier", "Supplier")
                         .WithMany("Products")
-                        .HasForeignKey("SupplierID");
+                        .HasForeignKey("SupplierID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Supplier");
                 });

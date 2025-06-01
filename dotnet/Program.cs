@@ -2,41 +2,85 @@
 
 using DatabaseContext dbContext = new DatabaseContext();
 
-dbContext.Suppliers.Add(
-    new Supplier()
-    {
-        CompanyName = "ACME Corp"
-    }
-);
+dbContext.Database.EnsureDeleted();
+dbContext.Database.EnsureCreated();
 
-var product = dbContext.Products
-                           .Include(p => p.Supplier)
-                           .SingleOrDefault(p => p.ProductName == "Kaczka");
-
-var supplier = dbContext.Suppliers.SingleOrDefault(s => s.CompanyName == "ACME Corp");
-
-if (product != null)
-    product.Supplier = supplier;
-
+var supplier = new Supplier
+{
+    CompanyName = "Myarse Company",
+    Street = "Ulica Przykładowa 5",
+    City = "Warszawa"
+};
+dbContext.Suppliers.Add(supplier);
 dbContext.SaveChanges();
 
-var query = dbContext.Products
-                     .Include(p => p.Supplier)
-                     .Select(p => new 
-                     {
-                         ProductName = p.ProductName,
-                         SupplierName = p.Supplier.CompanyName
-                     });
+var produkt1 = new Product { ProductName = "Rower", UnitsOnStock = 10, SupplierID = 1 };
+var produkt2 = new Product { ProductName = "Auto", UnitsOnStock = 5, SupplierID = 1 };
+var produkt3 = new Product { ProductName = "Klocki Lego", UnitsOnStock = 20, SupplierID = 1 };
 
-foreach (var item in query)
+dbContext.Products.AddRange(produkt1, produkt2, produkt3);
+dbContext.SaveChanges();
+
+var faktura1 = new Invoice
 {
-    Console.WriteLine($"{item.ProductName}, Dostawca: {item.SupplierName}");
+    InvoiceNumber = "F2025-001",
+    InvoiceDate = new DateTime(2025, 5, 10)
+};
+var faktura2 = new Invoice
+{
+    InvoiceNumber = "F2025-002",
+    InvoiceDate = new DateTime(2025, 5, 15)
+};
+
+dbContext.Invoices.AddRange(faktura1, faktura2);
+dbContext.SaveChanges();
+
+var sprzedaz1 = new InvoiceProduct
+{
+    InvoiceID = faktura1.InvoiceID,
+    ProductID = produkt1.ProductID,
+    Quantity = 2
+};
+var sprzedaz2 = new InvoiceProduct
+{
+    InvoiceID = faktura1.InvoiceID,
+    ProductID = produkt2.ProductID,
+    Quantity = 1
+};
+var sprzedaz3 = new InvoiceProduct
+{
+    InvoiceID = faktura2.InvoiceID,
+    ProductID = produkt3.ProductID,
+    Quantity = 3
+};
+var sprzedaz4 = new InvoiceProduct
+{
+    InvoiceID = faktura2.InvoiceID,
+    ProductID = produkt1.ProductID,
+    Quantity = 1
+};
+
+dbContext.InvoiceProducts.AddRange(sprzedaz1, sprzedaz2, sprzedaz3, sprzedaz4);
+dbContext.SaveChanges();
+
+
+var searched = "Rower";
+var wybranyProdukt = dbContext.Products
+    .SingleOrDefault(p => p.ProductName == searched);
+
+if (wybranyProdukt == null)
+{
+    Console.WriteLine($"Produkt o nazwie {searched} nie istnieje.");
+    return;
 }
 
-var query2 = from sup in dbContext.Suppliers
-select sup.CompanyName;
-Console.WriteLine("\nCompanies:");
-foreach (var sup in query2)
+var fakturyZProduktami = dbContext.InvoiceProducts
+    .Where(ip => ip.ProductID == wybranyProdukt.ProductID)
+    .Include(ip => ip.Invoice)
+    .ToList();
+
+Console.WriteLine($"Faktury, w których sprzedano produkt '{searched}':");
+foreach (var ip in fakturyZProduktami)
 {
-    Console.WriteLine(sup);
+    Console.WriteLine($"- Numer faktury: {ip.Invoice.InvoiceNumber}, Data: {ip.Invoice.InvoiceDate:d}, Ilość: {ip.Quantity}");
 }

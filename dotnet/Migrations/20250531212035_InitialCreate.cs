@@ -16,9 +16,10 @@ namespace Bazy_II.Migrations
                 {
                     SupplierID = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    CompanyName = table.Column<string>(type: "TEXT", nullable: true),
+                    CompanyName = table.Column<string>(type: "TEXT", nullable: false),
                     Street = table.Column<string>(type: "TEXT", nullable: true),
-                    City = table.Column<string>(type: "TEXT", nullable: true)
+                    City = table.Column<string>(type: "TEXT", nullable: true),
+                    ProductID = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -31,7 +32,7 @@ namespace Bazy_II.Migrations
                 {
                     ProductID = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    ProductName = table.Column<string>(type: "TEXT", nullable: true),
+                    ProductName = table.Column<string>(type: "TEXT", nullable: false),
                     UnitsOnStock = table.Column<int>(type: "INTEGER", nullable: false),
                     SupplierID = table.Column<int>(type: "INTEGER", nullable: false)
                 },
