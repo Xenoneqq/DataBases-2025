@@ -10,13 +10,24 @@ public class Product {
     public ICollection<InvoiceProduct> InvoiceProducts { get; set; } = new List<InvoiceProduct>();
 }
 
-public class Supplier
+public abstract class Company
 {
-    public int SupplierID { get; set; }
-    public required String CompanyName { get; set; }
-    public String? Street { get; set; }
-    public String? City { get; set; }
+    public int CompanyID { get; set; }            
+    public required string CompanyName { get; set; }    
+    public string? Street { get; set; }              
+    public string? City { get; set; }                   
+    public string? ZipCode { get; set; }       
+}
+
+public class Supplier : Company
+{
+    public string? BankAccountNumber { get; set; }
     public ICollection<Product> Products { get; set; } = new List<Product>();
+}
+
+public class Customer : Company
+{
+    public decimal Discount { get; set; }
 }
 
 public class Invoice
@@ -39,8 +50,11 @@ public class InvoiceProduct
 
 public class DatabaseContext : DbContext
 {
-    public DbSet<Product> Products { get; set; }
+    public DbSet<Company> Companies { get; set; }
     public DbSet<Supplier> Suppliers { get; set; }
+    public DbSet<Customer> Customers { get; set; }
+
+    public DbSet<Product> Products { get; set; }
     public DbSet<Invoice> Invoices { get; set; }
     public DbSet<InvoiceProduct> InvoiceProducts { get; set; }
 
@@ -52,25 +66,28 @@ public class DatabaseContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // relacja Supplier - Product
-            modelBuilder.Entity<Supplier>()
-                .HasMany(s => s.Products)
-                .WithOne(p => p.Supplier)
-                .HasForeignKey(p => p.SupplierID);
+        modelBuilder.Entity<Company>()
+            .HasDiscriminator<string>("CompanyType")
+            .HasValue<Supplier>("Supplier")
+            .HasValue<Customer>("Customer");
 
-            // relacja wiele‐do‐wielu przez encję InvoiceProduct
-            modelBuilder.Entity<InvoiceProduct>()
-                .HasKey(ip => new { ip.InvoiceID, ip.ProductID });
+        modelBuilder.Entity<Supplier>()
+            .HasMany(s => s.Products)
+            .WithOne(p => p.Supplier)
+            .HasForeignKey(p => p.SupplierID);
 
-            modelBuilder.Entity<InvoiceProduct>()
-                .HasOne(ip => ip.Invoice)
-                .WithMany(inv => inv.InvoiceProducts)
-                .HasForeignKey(ip => ip.InvoiceID);
+        modelBuilder.Entity<InvoiceProduct>()
+            .HasKey(ip => new { ip.InvoiceID, ip.ProductID });
 
-            modelBuilder.Entity<InvoiceProduct>()
-                .HasOne(ip => ip.Product)
-                .WithMany(prod => prod.InvoiceProducts)
-                .HasForeignKey(ip => ip.ProductID);
+        modelBuilder.Entity<InvoiceProduct>()
+            .HasOne(ip => ip.Invoice)
+            .WithMany(inv => inv.InvoiceProducts)
+            .HasForeignKey(ip => ip.InvoiceID);
+
+        modelBuilder.Entity<InvoiceProduct>()
+            .HasOne(ip => ip.Product)
+            .WithMany(prod => prod.InvoiceProducts)
+            .HasForeignKey(ip => ip.ProductID);
     }
 }
 

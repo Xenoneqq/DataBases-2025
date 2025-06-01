@@ -5,82 +5,136 @@ using DatabaseContext dbContext = new DatabaseContext();
 dbContext.Database.EnsureDeleted();
 dbContext.Database.EnsureCreated();
 
-var supplier = new Supplier
+var supplier1 = new Supplier
 {
-    CompanyName = "Myarse Company",
-    Street = "Ulica Przykładowa 5",
-    City = "Warszawa"
+    CompanyName = "Delta Logistics",
+    Street = "ul. Transportowa 12",
+    City = "Poznań",
+    ZipCode = "60-001",
+    BankAccountNumber = "PL69 1090 1014 0000 2137 1981 2874"
 };
-dbContext.Suppliers.Add(supplier);
+
+var supplier2 = new Supplier
+{
+    CompanyName = "TechFusion",
+    Street = "ul. Nowowiejska 5",
+    City = "Kraków",
+    ZipCode = "31-000",
+    BankAccountNumber = "PL61 2345 6789 0420 0123 4567 8901"
+};
+
+dbContext.Suppliers.AddRange(supplier1, supplier2);
 dbContext.SaveChanges();
 
-var produkt1 = new Product { ProductName = "Rower", UnitsOnStock = 10, SupplierID = 1 };
-var produkt2 = new Product { ProductName = "Auto", UnitsOnStock = 5, SupplierID = 1 };
-var produkt3 = new Product { ProductName = "Klocki Lego", UnitsOnStock = 20, SupplierID = 1 };
+var customer1 = new Customer
+{
+    CompanyName = "Sklep Zabawki",
+    Street = "ul. Dziecięca 3",
+    City = "Wrocław",
+    ZipCode = "50-001",
+    Discount = 0.12m
+};
 
-dbContext.Products.AddRange(produkt1, produkt2, produkt3);
+var customer2 = new Customer
+{
+    CompanyName = "SuperMarket S.A.",
+    Street = "ul. Ogrodowa 7",
+    City = "Gdańsk",
+    ZipCode = "80-001",
+    Discount = 0.05m
+};
+
+dbContext.Customers.AddRange(customer1, customer2);
 dbContext.SaveChanges();
 
-var faktura1 = new Invoice
+var product1 = new Product
 {
-    InvoiceNumber = "F2025-001",
-    InvoiceDate = new DateTime(2025, 5, 10)
+    ProductName = "Rower Miejski",
+    UnitsOnStock = 15,
+    SupplierID = supplier1.CompanyID   
 };
-var faktura2 = new Invoice
+var product2 = new Product
 {
-    InvoiceNumber = "F2025-002",
-    InvoiceDate = new DateTime(2025, 5, 15)
+    ProductName = "Hulajnoga Elektryczna",
+    UnitsOnStock = 8,
+    SupplierID = supplier1.CompanyID
 };
 
-dbContext.Invoices.AddRange(faktura1, faktura2);
+dbContext.Products.AddRange(product1, product2);
 dbContext.SaveChanges();
 
-var sprzedaz1 = new InvoiceProduct
+var invoice = new Invoice
 {
-    InvoiceID = faktura1.InvoiceID,
-    ProductID = produkt1.ProductID,
-    Quantity = 2
+    InvoiceNumber = "F2025-100",
+    InvoiceDate = DateTime.Today
 };
-var sprzedaz2 = new InvoiceProduct
+dbContext.Invoices.Add(invoice);
+dbContext.SaveChanges();
+
+var ip1 = new InvoiceProduct
 {
-    InvoiceID = faktura1.InvoiceID,
-    ProductID = produkt2.ProductID,
-    Quantity = 1
-};
-var sprzedaz3 = new InvoiceProduct
-{
-    InvoiceID = faktura2.InvoiceID,
-    ProductID = produkt3.ProductID,
+    InvoiceID = invoice.InvoiceID,
+    ProductID = product1.ProductID,
     Quantity = 3
 };
-var sprzedaz4 = new InvoiceProduct
+var ip2 = new InvoiceProduct
 {
-    InvoiceID = faktura2.InvoiceID,
-    ProductID = produkt1.ProductID,
+    InvoiceID = invoice.InvoiceID,
+    ProductID = product2.ProductID,
     Quantity = 1
 };
-
-dbContext.InvoiceProducts.AddRange(sprzedaz1, sprzedaz2, sprzedaz3, sprzedaz4);
+dbContext.InvoiceProducts.AddRange(ip1, ip2);
 dbContext.SaveChanges();
 
-
-var searched = "Rower";
-var wybranyProdukt = dbContext.Products
-    .SingleOrDefault(p => p.ProductName == searched);
-
-if (wybranyProdukt == null)
-{
-    Console.WriteLine($"Produkt o nazwie {searched} nie istnieje.");
-    return;
-}
-
-var fakturyZProduktami = dbContext.InvoiceProducts
-    .Where(ip => ip.ProductID == wybranyProdukt.ProductID)
-    .Include(ip => ip.Invoice)
+Console.WriteLine("Wszystkie firmy w bazie:");
+var wszystkieFirmy = dbContext.Companies
+    .AsNoTracking()
+    .OrderBy(c => c.CompanyID)
     .ToList();
 
-Console.WriteLine($"Faktury, w których sprzedano produkt '{searched}':");
-foreach (var ip in fakturyZProduktami)
+foreach (var firma in wszystkieFirmy)
 {
-    Console.WriteLine($"- Numer faktury: {ip.Invoice.InvoiceNumber}, Data: {ip.Invoice.InvoiceDate:d}, Ilość: {ip.Quantity}");
+    // Sprawdzamy typ po rzutowaniu
+    if (firma is Supplier s)
+    {
+        Console.WriteLine($"[Supplier]  ID = {s.CompanyID}, Nazwa = {s.CompanyName}, Miasto = {s.City}, BankAccount = {s.BankAccountNumber}");
+    }
+    else if (firma is Customer c)
+    {
+        Console.WriteLine($"[Customer]  ID = {c.CompanyID}, Nazwa = {c.CompanyName}, Miasto = {c.City}, Discount = {c.Discount:P0}");
+    }
+    else
+    {
+        Console.WriteLine($"[???]       ID = {firma.CompanyID}, Nazwa = {firma.CompanyName}");
+    }
+}
+
+Console.WriteLine();
+
+// tylko suppliers
+Console.WriteLine("Wyłącznie dostawcy:");
+var dostawcy = dbContext.Suppliers
+    .AsNoTracking()
+    .OrderBy(s => s.CompanyID)
+    .ToList();
+
+foreach (var d in dostawcy)
+{
+    Console.WriteLine($"- SupplierID = {d.CompanyID}, Nazwa = {d.CompanyName
+                        }, Bank = {d.BankAccountNumber}, Miasto = {d.City}");
+}
+
+Console.WriteLine();
+
+// tylko klienci
+Console.WriteLine("Wyłącznie klienci:");
+var klienci = dbContext.Customers
+    .AsNoTracking()
+    .OrderBy(c => c.CompanyID)
+    .ToList();
+
+foreach (var k in klienci)
+{
+    Console.WriteLine($"- CustomerID = {k.CompanyID}, Nazwa = {k.CompanyName
+                        }, Discount = {k.Discount:P0}, Miasto = {k.City}");
 }
