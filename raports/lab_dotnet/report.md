@@ -43,7 +43,7 @@ Wynik po:
 
 ___
 
-d) Stworzenie nowych tabel:
+d) Stworzenie nowych tabel: (dodajemy również pośrednią encję InvoiceProduct, ponieważ inaczej nie moglibyśmy dodać wartości "Quantity")
 ![alt text](./IId/tables.png)
 Dodanie relacji:
 ![alt text](./IId/relations.png)
