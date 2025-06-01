@@ -55,7 +55,8 @@ Kod wyświetlający produkty sprzedane w ramach wybranej faktury/transakcji:
 ![alt text](./IId/ii.png)
 Kod wyświetlający faktury, w ramach których sprzedany został wybrany produkt:
 ![alt text](./IId/iii.png)
-TODO screeny z terminala
+Wynik:
+![alt text](./IId/result.png)
 ___
 
 e) Dodanie nowych tabel:
