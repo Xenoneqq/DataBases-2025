@@ -72,7 +72,8 @@ Wynik:
 ![alt text](./IId/result.png)
 ___
 
-# E) Dodanie nowych tabel:
+# E) Strategia `Table-per-Hierarchy`
+Dodanie nowych tabel:
 ![alt text](./IIe/tables.png)
 Dodanie relacji między nimi
 ![alt text](./IIe/relations.png)
