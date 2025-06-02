@@ -2,7 +2,7 @@
 ## Entity Framework
 #### Autorzy
 
-**`Grupa 8 - [Śr 12:15 , A]`**
+**`Grupa 8 - [Śr 13:15 , A]`**
 
 - Bartosz Ludwin
 - Mateusz Pawliczek
