@@ -3080,19 +3080,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Bartek\\.nuget\\packages\\": {}
+    "C:\\Users\\McPla\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Bartek\\Documents\\GitHub\\DataBases-2025\\dotnet\\Bazy-II.csproj",
+      "projectUniqueName": "D:\\GitHub\\projects\\DataBases-2025\\dotnet\\Bazy-II.csproj",
       "projectName": "Bazy-II",
-      "projectPath": "C:\\Users\\Bartek\\Documents\\GitHub\\DataBases-2025\\dotnet\\Bazy-II.csproj",
-      "packagesPath": "C:\\Users\\Bartek\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Bartek\\Documents\\GitHub\\DataBases-2025\\dotnet\\obj\\",
+      "projectPath": "D:\\GitHub\\projects\\DataBases-2025\\dotnet\\Bazy-II.csproj",
+      "packagesPath": "C:\\Users\\McPla\\.nuget\\packages\\",
+      "outputPath": "D:\\GitHub\\projects\\DataBases-2025\\dotnet\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\Bartek\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\McPla\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
